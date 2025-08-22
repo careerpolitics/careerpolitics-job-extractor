@@ -1,10 +1,10 @@
 package com.careerpolitics.scraper.repository;
 
 
-import com.careerpolitics.scraper.model.ScrapingConfig;
+import com.careerpolitics.scraper.model.WebsiteConfig;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface ScrapeConfigRepository extends JpaRepository<ScrapingConfig, String> {
+public interface WebsiteConfigRepository extends JpaRepository<WebsiteConfig, String> {
 }

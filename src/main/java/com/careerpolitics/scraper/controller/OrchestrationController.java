@@ -1,5 +1,8 @@
 package com.careerpolitics.scraper.controller;
 
+import com.careerpolitics.scraper.model.request.ScheduleRequest;
+import com.careerpolitics.scraper.model.response.FullCycleResponse;
+import com.careerpolitics.scraper.model.response.ScrapingMetrics;
 import com.careerpolitics.scraper.service.JobOrchestrationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
