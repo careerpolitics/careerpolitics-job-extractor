@@ -10,6 +10,12 @@ import java.util.Map;
 @Service
 public class MarkdownGenerator {
 
+    private final AiContentService aiContentService;
+
+    public MarkdownGenerator(AiContentService aiContentService) {
+        this.aiContentService = aiContentService;
+    }
+
     public String generate(JobDetail detail) {
         StringBuilder md = new StringBuilder();
         // Title and hash tags
@@ -23,8 +29,9 @@ public class MarkdownGenerator {
             md.append("![Banner](").append(detail.getBannerImageUrl()).append(")\n\n");
         }
 
-        // Short intro
-        md.append(nullSafe(detail.getDescription())).append("\n\n");
+        // Enhanced intro via AI
+        String intro = aiContentService.enhanceDescription(detail.getTitle(), nullSafe(detail.getDescription()));
+        md.append(intro).append("\n\n");
 
         // Important Dates
         if (detail.getImportantDates() != null && !detail.getImportantDates().isEmpty()) {
