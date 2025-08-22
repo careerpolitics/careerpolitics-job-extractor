@@ -1,0 +1,74 @@
+spring:
+  application:
+    name: careerpolitics-scraper
+  datasource:
+    url: jdbc:h2:mem:careerpoliticsdb
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: true
+    show-sql: true
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+# CareerPolitics Configuration
+careerpolitics:
+  scraper:
+    base-url: https://www.sarkariexam.com
+    batch-size: 5
+    delay-ms: 1000
+    max-retries: 3
+    timeout-ms: 10000
+    user-agent: CareerPolitics-Scraper/1.0
+  storage:
+    s3-bucket: careerpolitics-job-images
+    image-quality: 85
+    max-image-size-kb: 500
+
+# API Documentation
+api:
+  title: CareerPolitics Job Scraper API
+  description: REST API for government job scraping and management
+  version: 1.0.0
+  contact:
+    name: CareerPolitics Team
+    email: support@careerpolitics.com
+    url: https://careerpolitics.com
+
+# Monitoring
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, metrics, info
+  endpoint:
+    health:
+      show-details: always
+  info:
+    env:
+      enabled: true
+
+# Logging
+logging:
+  level:
+    com.careerpolitics: DEBUG
+    org.springframework.web: INFO
+    org.hibernate.SQL: DEBUG
+  file:
+    name: logs/careerpolitics-scraper.log
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+server:
+  port: 8080
+  servlet:
+    context-path: /api
