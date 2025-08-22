@@ -35,6 +35,7 @@ public class DetailScraperService {
     private final JobDetailRepository jobDetailRepository;
     private final MarkdownGenerator markdownGenerator;
     private final ImageStorageService imageStorageService;
+    private final AiBannerService aiBannerService;
 
     public ScrapeBatchResponse scrapeBatch(int batchSize, boolean forceRetry) {
         LocalDateTime start = LocalDateTime.now();
@@ -65,6 +66,10 @@ public class DetailScraperService {
         return ScrapeBatchResponse.success(candidates.size(), successes.size(), successes, failures, time);
     }
 
+    public List<JobDetail> scrapeMultipleUrls(List<Long> urlIds) {
+        return urlIds.stream().map(this::scrapeSingleUrl).collect(Collectors.toList());
+    }
+
     public JobDetail scrapeSingleUrl(Long id) {
         JobSummary summary = jobSummaryRepository.findById(id).orElseThrow();
         JobDetail detail = scrapeDetail(summary);
@@ -72,10 +77,6 @@ public class DetailScraperService {
         summary.setLastError(null);
         jobSummaryRepository.save(summary);
         return detail;
-    }
-
-    public List<JobDetail> scrapeMultipleUrls(List<Long> urlIds) {
-        return urlIds.stream().map(this::scrapeSingleUrl).collect(Collectors.toList());
     }
 
     public ScrapeStatus getScrapeStatus(Long urlId) {
@@ -125,11 +126,16 @@ public class DetailScraperService {
             detail.setSourceWebsite(summary.getSourceWebsite());
             detail.setDescription(title);
 
-            // Generate banner image (placeholder composition) and upload to S3
-            byte[] banner = createSimpleBannerImage(title);
-            String bannerUrl = imageStorageService.uploadBanner(banner, title, "image/jpeg");
-            detail.setBannerImageUrl(bannerUrl);
-            detail.setHasImage(true);
+            // AI banner first, fallback to local render
+            byte[] banner = aiBannerService.generateBanner(title, "sarkarinaukri, jobs");
+            if (banner.length == 0) {
+                banner = createSimpleBannerImage(title);
+            }
+            if (banner.length > 0) {
+                String bannerUrl = imageStorageService.uploadBanner(banner, title, "image/jpeg");
+                detail.setBannerImageUrl(bannerUrl);
+                detail.setHasImage(true);
+            }
 
             String md = markdownGenerator.generate(detail);
             detail.setMarkdownContent(md);

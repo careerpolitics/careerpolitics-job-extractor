@@ -12,11 +12,16 @@ public class MarkdownGenerator {
 
     public String generate(JobDetail detail) {
         StringBuilder md = new StringBuilder();
-        // Title and tags
+        // Title and hash tags
         md.append("🚆 ").append(nullSafe(detail.getTitle())).append("\n");
         md.append("#\n");
-        md.append("# applyrrbonline\n# sarkarinaukri\n");
+        md.append("# sarkarinaukri\n# governmentjobs\n# applyonline\n");
         md.append("\n");
+
+        // Meta banner if available
+        if (detail.getBannerImageUrl() != null) {
+            md.append("![Banner](").append(detail.getBannerImageUrl()).append(")\n\n");
+        }
 
         // Short intro
         md.append(nullSafe(detail.getDescription())).append("\n\n");
@@ -34,8 +39,7 @@ public class MarkdownGenerator {
         // Vacancy & Pay
         if (detail.getVacancies() != null) {
             md.append("📄 Vacancy & Pay Details\n");
-            md.append("Total Posts: ").append(detail.getVacancies()).append("\n");
-            md.append("\n");
+            md.append("Total Posts: ").append(detail.getVacancies()).append("\n\n");
         }
 
         // Eligibility
@@ -72,8 +76,21 @@ public class MarkdownGenerator {
         }
         md.append("\n");
 
+        // FAQs (placeholder for SEO)
+        md.append("❓ Frequently Asked Questions (FAQs)\n");
+        md.append("Q1. What is the last date to apply?\n\n");
+        md.append("Q2. How many vacancies are there?\n\n");
+        md.append("Q3. What is the eligibility?\n\n");
+
+        // Voice Search Keywords
+        md.append("🔍 Voice Search Keywords\n");
+        md.append("\"How to apply online for this recruitment?\"\n");
+        md.append("\"Eligibility for technician posts\"\n");
+        md.append("\"Age limit for government technician recruitment\"\n");
+        md.append("\n");
+
         // CTA
-        md.append("🎯 Stay updated on Railway Jobs, Sarkari Results, and Exam Dates.\n");
+        md.append("🎯 Stay updated on Government Jobs, Sarkari Results, and Exam Dates.\n");
         md.append("👉 WhatsApp Channel\n\n📢 Telegram Channel\n");
 
         return md.toString();
