@@ -2,6 +2,8 @@ package com.careerpolitics.scraper.repository;
 
 
 import com.careerpolitics.scraper.model.JobSummary;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -17,8 +19,7 @@ public interface JobSummaryRepository extends JpaRepository<JobSummary, Long> {
     @Query("SELECT js FROM JobSummary js WHERE js.processed = false ORDER BY js.discoveredAt DESC")
     List<JobSummary> findUnprocessedJobs();
 
-    @Query("SELECT js FROM JobSummary js WHERE js.processed = false ORDER BY js.discoveredAt DESC LIMIT :limit")
-    List<JobSummary> findUnprocessedJobs(@Param("limit") int limit);
+    Page<JobSummary> findByProcessedFalseOrderByDiscoveredAtDesc(Pageable pageable);
 
     List<JobSummary> findBySourceWebsite(String sourceWebsite);
 

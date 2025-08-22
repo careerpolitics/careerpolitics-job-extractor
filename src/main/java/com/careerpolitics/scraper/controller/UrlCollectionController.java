@@ -1,6 +1,7 @@
 package com.careerpolitics.scraper.controller;
 
 import com.careerpolitics.scraper.model.JobSummary;
+import com.careerpolitics.scraper.model.response.UrlDiscoveryResponse;
 import com.careerpolitics.scraper.service.UrlCollectorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
