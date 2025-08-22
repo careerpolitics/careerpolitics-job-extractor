@@ -4,43 +4,78 @@ package com.careerpolitics.scraper.service;
 import com.careerpolitics.scraper.model.JobDetail;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+import java.util.Map;
+
 @Service
 public class MarkdownGenerator {
 
     public String generate(JobDetail detail) {
         StringBuilder md = new StringBuilder();
-        md.append("# ").append(detail.getTitle() != null ? detail.getTitle() : "Job Detail").append("\n\n");
-        md.append("- **Source**: ").append(nullSafe(detail.getSourceWebsite())).append("\n");
-        md.append("- **URL**: ").append(nullSafe(detail.getUrl())).append("\n");
-        if (detail.getDepartment() != null) {
-            md.append("- **Department**: ").append(detail.getDepartment()).append("\n");
+        // Title and tags
+        md.append("🚆 ").append(nullSafe(detail.getTitle())).append("\n");
+        md.append("#\n");
+        md.append("# applyrrbonline\n# sarkarinaukri\n");
+        md.append("\n");
+
+        // Short intro
+        md.append(nullSafe(detail.getDescription())).append("\n\n");
+
+        // Important Dates
+        if (detail.getImportantDates() != null && !detail.getImportantDates().isEmpty()) {
+            md.append("🗓️ Important Dates\n");
+            md.append("Event\tDate\n");
+            for (Map.Entry<String, String> e : detail.getImportantDates().entrySet()) {
+                md.append(e.getKey()).append("\t").append(e.getValue()).append("\n");
+            }
+            md.append("\n");
         }
+
+        // Vacancy & Pay
         if (detail.getVacancies() != null) {
-            md.append("- **Vacancies**: ").append(detail.getVacancies()).append("\n");
+            md.append("📄 Vacancy & Pay Details\n");
+            md.append("Total Posts: ").append(detail.getVacancies()).append("\n");
+            md.append("\n");
         }
+
+        // Eligibility
+        if (detail.getEligibilityCriteria() != null && !detail.getEligibilityCriteria().isEmpty()) {
+            md.append("🎓 Eligibility Criteria\n");
+            for (String c : detail.getEligibilityCriteria()) {
+                md.append("- ").append(c).append("\n");
+            }
+            md.append("\n");
+        }
+
+        // Selection Process
+        if (detail.getSelectionProcess() != null) {
+            md.append("🧪 Selection Process\n").append(detail.getSelectionProcess()).append("\n\n");
+        }
+
+        // Exam Pattern
+        if (detail.getExamPattern() != null) {
+            md.append("📋 Exam Pattern\n").append(detail.getExamPattern()).append("\n\n");
+        }
+
+        // Application Fee
         if (detail.getApplicationFee() != null) {
-            md.append("- **Application Fee**: ").append(detail.getApplicationFee()).append("\n");
+            md.append("💰 Application Fee\n").append(detail.getApplicationFee()).append("\n\n");
+        }
+
+        // Links
+        md.append("📎 Official Links\n");
+        if (detail.getApplicationLink() != null) {
+            md.append("📝 Apply Online\t").append(detail.getApplicationLink()).append("\n");
+        }
+        if (detail.getNotificationLink() != null) {
+            md.append("📄 Notification (PDF)\t").append(detail.getNotificationLink()).append("\n");
         }
         md.append("\n");
-        if (detail.getDescription() != null) {
-            md.append("## Description\n\n").append(detail.getDescription()).append("\n\n");
-        }
-        if (detail.getImportantDates() != null && !detail.getImportantDates().isEmpty()) {
-            md.append("## Important Dates\n\n");
-            detail.getImportantDates().forEach((k, v) -> md.append("- ").append(k).append(": ").append(v).append("\n"));
-            md.append("\n");
-        }
-        if (detail.getEligibilityCriteria() != null && !detail.getEligibilityCriteria().isEmpty()) {
-            md.append("## Eligibility\n\n");
-            detail.getEligibilityCriteria().forEach(c -> md.append("- ").append(c).append("\n"));
-            md.append("\n");
-        }
-        if (detail.getSelectionProcess() != null) {
-            md.append("## Selection Process\n\n").append(detail.getSelectionProcess()).append("\n\n");
-        }
-        if (detail.getExamPattern() != null) {
-            md.append("## Exam Pattern\n\n").append(detail.getExamPattern()).append("\n\n");
-        }
+
+        // CTA
+        md.append("🎯 Stay updated on Railway Jobs, Sarkari Results, and Exam Dates.\n");
+        md.append("👉 WhatsApp Channel\n\n📢 Telegram Channel\n");
+
         return md.toString();
     }
 

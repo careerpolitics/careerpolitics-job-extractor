@@ -67,6 +67,9 @@ public class JobDetail {
     @Column(name = "has_image")
     private boolean hasImage = false;
 
+    @Column(name = "banner_image_url", length = 1000)
+    private String bannerImageUrl;
+
     @Column(name = "source_website")
     private String sourceWebsite;
 

@@ -14,10 +14,17 @@ import org.jsoup.nodes.Document;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.GradientPaint;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
+import javax.imageio.ImageIO;
 
 @Slf4j
 @Service
@@ -27,6 +34,7 @@ public class DetailScraperService {
     private final JobSummaryRepository jobSummaryRepository;
     private final JobDetailRepository jobDetailRepository;
     private final MarkdownGenerator markdownGenerator;
+    private final ImageStorageService imageStorageService;
 
     public ScrapeBatchResponse scrapeBatch(int batchSize, boolean forceRetry) {
         LocalDateTime start = LocalDateTime.now();
@@ -116,11 +124,40 @@ public class DetailScraperService {
             detail.setUrl(summary.getUrl());
             detail.setSourceWebsite(summary.getSourceWebsite());
             detail.setDescription(title);
+
+            // Generate banner image (placeholder composition) and upload to S3
+            byte[] banner = createSimpleBannerImage(title);
+            String bannerUrl = imageStorageService.uploadBanner(banner, title, "image/jpeg");
+            detail.setBannerImageUrl(bannerUrl);
+            detail.setHasImage(true);
+
             String md = markdownGenerator.generate(detail);
             detail.setMarkdownContent(md);
             return jobDetailRepository.save(detail);
         } catch (Exception ex) {
             throw new RuntimeException(ex.getMessage(), ex);
+        }
+    }
+
+    private byte[] createSimpleBannerImage(String title) {
+        try {
+            int width = 1200;
+            int height = 630;
+            BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+            Graphics2D g = image.createGraphics();
+            g.setPaint(new GradientPaint(0, 0, new Color(14, 88, 161), width, height, new Color(2, 21, 40)));
+            g.fillRect(0, 0, width, height);
+            g.setColor(Color.WHITE);
+            g.setFont(new Font("SansSerif", Font.BOLD, 48));
+            String text = title.length() > 60 ? title.substring(0, 57) + "..." : title;
+            int textWidth = g.getFontMetrics().stringWidth(text);
+            g.drawString(text, Math.max(40, (width - textWidth) / 2), height / 2);
+            g.dispose();
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            ImageIO.write(image, "jpg", baos);
+            return baos.toByteArray();
+        } catch (Exception ex) {
+            return new byte[0];
         }
     }
 }
