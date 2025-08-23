@@ -37,6 +37,7 @@ public class DetailScraperService {
     private final ImageStorageService imageStorageService;
     private final AiBannerService aiBannerService;
     private final AiExtractorService aiExtractorService;
+    private final AiMarkdownService aiMarkdownService;
 
     public ScrapeBatchResponse scrapeBatch(int batchSize, boolean forceRetry) {
         LocalDateTime start = LocalDateTime.now();
@@ -142,8 +143,14 @@ public class DetailScraperService {
                 detail.setHasImage(true);
             }
 
-            String md = markdownGenerator.generate(detail);
-            detail.setMarkdownContent(md);
+            // AI markdown first, fallback to local generator
+            String rich = aiMarkdownService.generateRichMarkdown(detail);
+            if (rich != null && !rich.isBlank()) {
+                detail.setMarkdownContent(rich);
+            } else {
+                String md = markdownGenerator.generate(detail);
+                detail.setMarkdownContent(md);
+            }
             return jobDetailRepository.save(detail);
         } catch (Exception ex) {
             throw new RuntimeException(ex.getMessage(), ex);
