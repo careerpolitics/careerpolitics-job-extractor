@@ -20,24 +20,18 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AiExtractorService {
 
-    private static final int MAX_CONTENT_CHARS = 1200;
+    private static final int MAX_CONTENT_CHARS = 2000;
 
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
+    private final AiContentService aiContentService;
 
     public Map<String, Object> extractJobData(String url, String title, String html) {
         try {
             String contentSnippet = extractRelevantText(html, MAX_CONTENT_CHARS);
-            String instruction = "Extract structured job details as compact JSON with fields: title, department, vacancies (int), applicationLink, notificationLink, description, importantDates(object map name->date), eligibilityCriteria(array), examPattern, applicationFee, selectionProcess. Use only values present or reasonable N/A.";
+            String instruction = "You are an information extraction system. Extract and ENHANCE concise structured job details as strict JSON with these keys: title (string), department (string), vacancies (int), applicationLink (string), notificationLink (string), description (string, improved), importantDates (object of name->date string), eligibilityCriteria (array of strings), examPattern (string), applicationFee (string), selectionProcess (string). If unknown, use 'N/A' or [] or {} accordingly. Return ONLY JSON, no prose.";
             String prompt = instruction + "\nURL: " + url + "\nTITLE: " + title + "\nCONTENT: " + contentSnippet;
-            String encoded = URLEncoder.encode(prompt, StandardCharsets.UTF_8);
-            String endpoint = "https://text.pollinations.ai/" + encoded;
-            String response = webClient.get()
-                    .uri(endpoint)
-                    .accept(MediaType.TEXT_PLAIN, MediaType.ALL)
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
+            String response = aiContentService.generate(prompt);
             if (response == null || response.isBlank()) return Map.of();
             String candidate = findJsonBlock(response);
             if (candidate == null) return Map.of();
@@ -61,13 +55,13 @@ public class AiExtractorService {
                 Element main = doc.selectFirst("main, #main, .main, #content, .content");
                 text = (main != null) ? main.text() : doc.body().text();
             }
-            text = text.replaceAll("\s+", " ").trim();
+            text = text.replaceAll("\\s+", " ").trim();
             if (text.length() > maxLen) {
                 return text.substring(0, maxLen);
             }
             return text;
         } catch (Exception ex) {
-            String plain = html.replaceAll("<[^>]+>", " ").replaceAll("\s+", " ").trim();
+            String plain = html.replaceAll("<[^>]+>", " ").replaceAll("\\s+", " ").trim();
             if (plain.length() > maxLen) return plain.substring(0, maxLen);
             return plain;
         }

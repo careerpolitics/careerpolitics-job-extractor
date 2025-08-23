@@ -34,22 +34,25 @@ public class AiContentService {
     @Value("${OPENROUTER_API_KEY:}")
     private String openRouterApiKey;
 
+    public String generate(String prompt) {
+        String provider = resolveProvider();
+        switch (provider) {
+            case "gemini":
+                return callGemini(prompt);
+            case "openai":
+                return callOpenAi(prompt);
+            case "openrouter":
+                return callOpenRouter(prompt);
+            default:
+                return callPollinationsFallback(prompt);
+        }
+    }
+
     public String enhanceDescription(String rawTitle, String rawDescription) {
         String prompt = "Improve and expand this government job post intro in 2-3 concise, SEO-friendly sentences. Use neutral tone, include key numbers if present. Title: '" +
                 safe(rawTitle) + "'. Intro: '" + safe(rawDescription) + "'";
         try {
-            // Select provider by override or available keys
-            String provider = resolveProvider();
-            switch (provider) {
-                case "gemini":
-                    return callGemini(prompt);
-                case "openai":
-                    return callOpenAi(prompt);
-                case "openrouter":
-                    return callOpenRouter(prompt);
-                default:
-                    return callPollinationsFallback(prompt);
-            }
+            return generate(prompt);
         } catch (Exception ex) {
             return rawDescription;
         }
