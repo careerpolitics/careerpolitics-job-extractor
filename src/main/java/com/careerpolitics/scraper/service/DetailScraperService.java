@@ -36,6 +36,7 @@ public class DetailScraperService {
     private final MarkdownGenerator markdownGenerator;
     private final ImageStorageService imageStorageService;
     private final AiBannerService aiBannerService;
+    private final AiExtractorService aiExtractorService;
 
     public ScrapeBatchResponse scrapeBatch(int batchSize, boolean forceRetry) {
         LocalDateTime start = LocalDateTime.now();
@@ -126,6 +127,10 @@ public class DetailScraperService {
             detail.setSourceWebsite(summary.getSourceWebsite());
             detail.setDescription(title);
 
+            // AI extraction of fields
+            Map<String, Object> extracted = aiExtractorService.extractJobData(summary.getUrl(), title, doc.html());
+            applyExtracted(detail, extracted);
+
             // AI banner first, fallback to local render
             byte[] banner = aiBannerService.generateBanner(title, "sarkarinaukri, jobs");
             if (banner.length == 0) {
@@ -142,6 +147,42 @@ public class DetailScraperService {
             return jobDetailRepository.save(detail);
         } catch (Exception ex) {
             throw new RuntimeException(ex.getMessage(), ex);
+        }
+    }
+
+    private void applyExtracted(JobDetail detail, Map<String, Object> map) {
+        if (map == null || map.isEmpty()) return;
+        Object department = map.get("department");
+        if (department instanceof String) detail.setDepartment((String) department);
+        Object vacancies = map.get("vacancies");
+        if (vacancies instanceof Number) detail.setVacancies(((Number) vacancies).intValue());
+        Object applicationLink = map.get("applicationLink");
+        if (applicationLink instanceof String) detail.setApplicationLink((String) applicationLink);
+        Object notificationLink = map.get("notificationLink");
+        if (notificationLink instanceof String) detail.setNotificationLink((String) notificationLink);
+        Object description = map.get("description");
+        if (description instanceof String) detail.setDescription((String) description);
+        Object selectionProcess = map.get("selectionProcess");
+        if (selectionProcess instanceof String) detail.setSelectionProcess((String) selectionProcess);
+        Object examPattern = map.get("examPattern");
+        if (examPattern instanceof String) detail.setExamPattern((String) examPattern);
+        Object applicationFee = map.get("applicationFee");
+        if (applicationFee instanceof String) detail.setApplicationFee((String) applicationFee);
+        Object importantDates = map.get("importantDates");
+        if (importantDates instanceof Map) {
+            try {
+                @SuppressWarnings("unchecked")
+                Map<String, String> dates = (Map<String, String>) importantDates;
+                detail.setImportantDates(dates);
+            } catch (Exception ignored) {}
+        }
+        Object eligibilityCriteria = map.get("eligibilityCriteria");
+        if (eligibilityCriteria instanceof List) {
+            try {
+                @SuppressWarnings("unchecked")
+                List<String> list = (List<String>) eligibilityCriteria;
+                detail.setEligibilityCriteria(list);
+            } catch (Exception ignored) {}
         }
     }
 
