@@ -81,3 +81,30 @@ Optional env vars:
 ## Notes
 - Defaults seed in `data.sql` for H2
 - For production, configure PostgreSQL datasource and Spring profiles
+## Trending Jobs/Education Article Generation
+
+A new endpoint can discover Google Trends topics in India (jobs/education), gather related Google News headlines, generate an AI-written Forem markdown article, and publish it to CareerPolitics article API.
+
+### Endpoint
+`POST /careerpolitics/api/careerpolitics/content/trends/article`
+
+Example request:
+```json
+{
+  "geo": "IN",
+  "language": "en-US",
+  "maxTrends": 5,
+  "maxNewsPerTrend": 3,
+  "publish": true,
+  "fallbackTrends": ["UPSC", "NEET", "Campus Placements"]
+}
+```
+
+### Required environment variables
+- `OPENAI_API_KEY` for AI article generation
+- `CAREERPOLITICS_ARTICLE_API_URL` for article publishing endpoint
+- `CAREERPOLITICS_ARTICLE_API_TOKEN` optional auth token sent as `api-key`
+
+### Notes
+- Google Trends blocks some automated traffic; if trend scraping fails, provide `fallbackTrends`.
+- If `publish` is false, the API only returns generated content without posting.

@@ -42,6 +42,16 @@ careerpolitics:
     s3-bucket: careerpolitics-job-images
     image-quality: 85
     max-image-size-kb: 500
+  content:
+    google-trends-url: https://trends.google.com/trending
+    google-news-rss-url: https://news.google.com/rss/search
+    ai:
+      base-url: https://api.openai.com/v1
+      model: gpt-4o-mini
+      api-key: ${OPENAI_API_KEY:}
+    article-api:
+      url: ${CAREERPOLITICS_ARTICLE_API_URL:}
+      token: ${CAREERPOLITICS_ARTICLE_API_TOKEN:}
 
 # API Documentation
 api:
