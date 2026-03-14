@@ -46,9 +46,10 @@ careerpolitics:
     google-trends-url: https://trends.google.com/trending
     google-news-rss-url: https://news.google.com/rss/search
     ai:
-      base-url: https://api.openai.com/v1
-      model: gpt-4o-mini
-      api-key: ${OPENAI_API_KEY:}
+      google:
+        base-url: https://generativelanguage.googleapis.com/v1beta
+        model: gemini-1.5-flash
+        api-key: ${GOOGLE_AI_API_KEY:}
     article-api:
       url: ${CAREERPOLITICS_ARTICLE_API_URL:}
       token: ${CAREERPOLITICS_ARTICLE_API_TOKEN:}

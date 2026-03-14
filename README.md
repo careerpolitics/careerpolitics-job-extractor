@@ -83,7 +83,7 @@ Optional env vars:
 - For production, configure PostgreSQL datasource and Spring profiles
 ## Trending Jobs/Education Article Generation
 
-A new endpoint can discover Google Trends topics in India (jobs/education), gather related Google News headlines, generate an AI-written Forem markdown article, and publish it to CareerPolitics article API.
+A new endpoint can discover Google Trends topics in India (jobs/education), gather related Google News headlines, generate a Google AI (Gemini)-written Forem markdown article, and publish it to CareerPolitics article API.
 
 ### Endpoint
 `POST /careerpolitics/api/careerpolitics/content/trends/article`
@@ -105,7 +105,7 @@ Example request:
 ```
 
 ### Required environment variables
-- `OPENAI_API_KEY` for AI article generation
+- `GOOGLE_AI_API_KEY` for Google AI (Gemini) article generation
 - `CAREERPOLITICS_ARTICLE_API_URL` for article publishing endpoint
 - `CAREERPOLITICS_ARTICLE_API_TOKEN` optional auth token sent as `api-key`
 

@@ -39,14 +39,14 @@ public class TrendArticleService {
     @Value("${careerpolitics.content.google-news-rss-url:https://news.google.com/rss/search}")
     private String googleNewsRssUrl;
 
-    @Value("${careerpolitics.content.ai.base-url:https://api.openai.com/v1}")
-    private String aiBaseUrl;
+    @Value("${careerpolitics.content.ai.google.base-url:https://generativelanguage.googleapis.com/v1beta}")
+    private String googleAiBaseUrl;
 
-    @Value("${careerpolitics.content.ai.model:gpt-4o-mini}")
-    private String aiModel;
+    @Value("${careerpolitics.content.ai.google.model:gemini-1.5-flash}")
+    private String googleAiModel;
 
-    @Value("${careerpolitics.content.ai.api-key:}")
-    private String aiApiKey;
+    @Value("${careerpolitics.content.ai.google.api-key:}")
+    private String googleAiApiKey;
 
     @Value("${careerpolitics.content.article-api.url:}")
     private String articleApiUrl;
@@ -66,7 +66,7 @@ public class TrendArticleService {
         }
 
         List<TrendNewsItem> newsItems = collectNews(trends, request.getMaxNewsPerTrend());
-        Map<String, String> article = generateArticleWithAi(trends, newsItems);
+        Map<String, String> article = generateArticleWithGoogleAi(trends, newsItems);
 
         Map<String, Object> publishResponse = null;
         boolean published = false;
@@ -157,9 +157,9 @@ public class TrendArticleService {
         return newsItems;
     }
 
-    Map<String, String> generateArticleWithAi(List<String> trends, List<TrendNewsItem> newsItems) {
-        if (aiApiKey == null || aiApiKey.isBlank()) {
-            throw new IllegalStateException("AI API key is missing. Set careerpolitics.content.ai.api-key");
+    Map<String, String> generateArticleWithGoogleAi(List<String> trends, List<TrendNewsItem> newsItems) {
+        if (googleAiApiKey == null || googleAiApiKey.isBlank()) {
+            throw new IllegalStateException("Google AI API key is missing. Set careerpolitics.content.ai.google.api-key");
         }
 
         String newsContext = newsItems.stream()
@@ -175,22 +175,25 @@ public class TrendArticleService {
                 "Trends: " + String.join(", ", trends) + "\n" +
                 "News:\n" + newsContext;
 
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", aiModel);
-        body.put("response_format", Map.of("type", "json_object"));
-        body.put("messages", List.of(
-                Map.of("role", "system", "content", "You generate high-quality SEO-friendly career articles."),
-                Map.of("role", "user", "content", prompt)
-        ));
+        Map<String, Object> body = Map.of(
+                "contents", List.of(Map.of(
+                        "parts", List.of(Map.of("text", prompt))
+                )),
+                "generationConfig", Map.of(
+                        "responseMimeType", "application/json"
+                )
+        );
 
         WebClient client = WebClient.builder()
-                .baseUrl(aiBaseUrl)
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + aiApiKey)
+                .baseUrl(googleAiBaseUrl)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .build();
 
         String raw = client.post()
-                .uri("/chat/completions")
+                .uri(uriBuilder -> uriBuilder
+                        .path("/models/{model}:generateContent")
+                        .queryParam("key", googleAiApiKey)
+                        .build(googleAiModel))
                 .bodyValue(body)
                 .retrieve()
                 .bodyToMono(String.class)
@@ -198,14 +201,14 @@ public class TrendArticleService {
 
         try {
             JsonNode root = objectMapper.readTree(raw);
-            String content = root.path("choices").path(0).path("message").path("content").asText();
+            String content = root.path("candidates").path(0).path("content").path("parts").path(0).path("text").asText();
             JsonNode article = objectMapper.readTree(content);
             Map<String, String> result = new HashMap<>();
             result.put("title", article.path("title").asText("Weekly Trends: Jobs & Education in India"));
             result.put("markdown", article.path("markdown").asText(""));
             return result;
         } catch (Exception ex) {
-            throw new IllegalStateException("Failed to parse AI response", ex);
+            throw new IllegalStateException("Failed to parse Google AI response", ex);
         }
     }
 
