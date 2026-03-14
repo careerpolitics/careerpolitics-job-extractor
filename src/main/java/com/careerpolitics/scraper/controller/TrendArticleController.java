@@ -4,6 +4,8 @@ import com.careerpolitics.scraper.model.request.TrendArticleRequest;
 import com.careerpolitics.scraper.model.response.TrendArticleResponse;
 import com.careerpolitics.scraper.service.TrendArticleService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +24,13 @@ public class TrendArticleController {
     private final TrendArticleService trendArticleService;
 
     @PostMapping("/trends/article")
-    @Operation(summary = "Fetch Google trends + news, generate AI article, and optionally publish")
+    @Operation(summary = "Fetch Google trends + news, generate AI article, and optionally publish",
+            description = "Builds a Forem-ready article from trends and related headlines; optionally publishes to CareerPolitics article API.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Article generated successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid request payload"),
+            @ApiResponse(responseCode = "500", description = "Generation or publishing failed")
+    })
     public ResponseEntity<TrendArticleResponse> createTrendingArticle(@Valid @RequestBody TrendArticleRequest request) {
         return ResponseEntity.ok(trendArticleService.createAndOptionallyPublish(request));
     }

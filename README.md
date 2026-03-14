@@ -88,6 +88,10 @@ A new endpoint can discover Google Trends topics in India (jobs/education), gath
 ### Endpoint
 `POST /careerpolitics/api/careerpolitics/content/trends/article`
 
+All APIs are documented in Swagger/OpenAPI (including this endpoint):
+- Swagger UI: `/careerpolitics/swagger-ui/index.html`
+- OpenAPI JSON: `/careerpolitics/v3/api-docs`
+
 Example request:
 ```json
 {
