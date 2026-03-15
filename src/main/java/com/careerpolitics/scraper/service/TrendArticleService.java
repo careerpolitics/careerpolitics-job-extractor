@@ -36,8 +36,8 @@ public class TrendArticleService {
     @Value("${careerpolitics.content.google-trends-url:https://trends.google.com/trending}")
     private String googleTrendsUrl;
 
-    @Value("${careerpolitics.content.google-news-rss-url:https://news.google.com/rss/search}")
-    private String googleNewsRssUrl;
+    @Value("${careerpolitics.content.google-search-url:https://www.google.com/search}")
+    private String googleSearchUrl;
 
     @Value("${careerpolitics.content.ai.google.base-url:https://generativelanguage.googleapis.com/v1beta}")
     private String googleAiBaseUrl;
@@ -56,16 +56,21 @@ public class TrendArticleService {
 
     public TrendArticleResponse createAndOptionallyPublish(TrendArticleRequest request) {
         List<String> trends = fetchGoogleTrends(request.getGeo(), request.getLanguage(), request.getMaxTrends());
+
         if (trends.isEmpty() && request.getFallbackTrends() != null) {
-            trends = request.getFallbackTrends().stream().filter(Objects::nonNull).map(String::trim)
-                    .filter(s -> !s.isBlank()).limit(request.getMaxTrends()).toList();
+            trends = request.getFallbackTrends().stream()
+                    .filter(Objects::nonNull)
+                    .map(String::trim)
+                    .filter(s -> !s.isBlank())
+                    .limit(request.getMaxTrends())
+                    .toList();
         }
 
         if (trends.isEmpty()) {
-            throw new IllegalStateException("Could not discover trends from Google Trends and no fallback trends were provided");
+            throw new IllegalStateException("Could not scrape trending topics from Google Trends and no fallbackTrends were provided");
         }
 
-        List<TrendNewsItem> newsItems = collectNews(trends, request.getMaxNewsPerTrend());
+        List<TrendNewsItem> newsItems = gatherDetailsForTrends(trends, request.getMaxNewsPerTrend(), request.getGeo(), request.getLanguage());
         Map<String, String> article = generateArticleWithGoogleAi(trends, newsItems);
 
         Map<String, Object> publishResponse = null;
@@ -89,22 +94,27 @@ public class TrendArticleService {
         List<String> trends = new ArrayList<>();
 
         try {
-            String url = googleTrendsUrl + "?geo=" + urlEncode(geo) + "&hl=" + urlEncode(language)
-                    + "&category=9&status=active";
-
+            String url = googleTrendsUrl + "?geo=" + urlEncode(geo) + "&hl=" + urlEncode(language) + "&category=9&status=active";
             Document doc = Jsoup.connect(url)
                     .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                     .timeout(15000)
                     .get();
 
-            Elements candidates = doc.select("a[title], div[title], [data-term], [aria-label]");
-            for (Element element : candidates) {
-                String value = Optional.ofNullable(element.attr("data-term")).filter(v -> !v.isBlank())
-                        .orElseGet(() -> Optional.ofNullable(element.attr("title")).filter(v -> !v.isBlank())
-                                .orElse(element.attr("aria-label")));
+            // Prefer actual trend cells from Google Trends page.
+            Elements trendCandidates = doc.select(
+                    "div[aria-label] a, a[title], div[title], [data-term], [data-row-id], .mZ3RIc, .QNIh4d, .mM5pbd"
+            );
 
-                String cleaned = clean(value);
-                if (cleaned.length() > 2 && cleaned.length() < 120 && !trends.contains(cleaned)) {
+            for (Element element : trendCandidates) {
+                String text = firstNonBlank(
+                        element.attr("data-term"),
+                        element.attr("title"),
+                        element.attr("aria-label"),
+                        element.text()
+                );
+
+                String cleaned = clean(text);
+                if (isLikelyTrendTerm(cleaned) && !trends.contains(cleaned)) {
                     trends.add(cleaned);
                 }
                 if (trends.size() >= maxTrends) {
@@ -112,49 +122,89 @@ public class TrendArticleService {
                 }
             }
         } catch (Exception ex) {
-            log.warn("Failed to scrape Google Trends: {}", ex.getMessage());
+            log.warn("Failed to scrape Google Trends page: {}", ex.getMessage());
         }
 
         return trends.stream().limit(maxTrends).toList();
     }
 
-    List<TrendNewsItem> collectNews(List<String> trends, int maxNewsPerTrend) {
-        List<TrendNewsItem> newsItems = new ArrayList<>();
+    List<TrendNewsItem> gatherDetailsForTrends(List<String> trends, int maxArticlesPerTrend, String geo, String language) {
+        List<TrendNewsItem> items = new ArrayList<>();
 
         for (String trend : trends) {
             try {
-                String rssUrl = googleNewsRssUrl + "?q=" + urlEncode(trend + " jobs education India") + "&hl=en-IN&gl=IN&ceid=IN:en";
-                Document doc = Jsoup.connect(rssUrl)
-                        .userAgent("Mozilla/5.0")
+                String query = trend + " jobs education " + geo;
+                String url = googleSearchUrl + "?q=" + urlEncode(query) + "&tbm=nws&hl=" + urlEncode(language) + "&gl=" + urlEncode(geo);
+
+                Document doc = Jsoup.connect(url)
+                        .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                        .referrer("https://www.google.com/")
                         .timeout(15000)
                         .get();
 
-                Elements items = doc.select("item");
+                // Google News search result cards (best-effort selectors)
+                Elements cards = doc.select("div.SoaBEf, div.dbsr, g-card");
                 int count = 0;
-                for (Element item : items) {
-                    if (count >= maxNewsPerTrend) {
+
+                for (Element card : cards) {
+                    if (count >= maxArticlesPerTrend) {
                         break;
                     }
-                    TrendNewsItem news = TrendNewsItem.builder()
-                            .trend(trend)
-                            .title(clean(item.selectFirst("title") != null ? item.selectFirst("title").text() : ""))
-                            .link(item.selectFirst("link") != null ? item.selectFirst("link").text() : "")
-                            .source(item.selectFirst("source") != null ? item.selectFirst("source").text() : "Google News")
-                            .publishedAt(item.selectFirst("pubDate") != null ? item.selectFirst("pubDate").text() : "")
-                            .snippet(clean(item.selectFirst("description") != null ? Jsoup.parse(item.selectFirst("description").text()).text() : ""))
-                            .build();
 
-                    if (!news.getTitle().isBlank()) {
-                        newsItems.add(news);
+                    Element titleEl = firstElement(card, "div.n0jPhd", "div.JheGif", "h3", "a > div");
+                    Element linkEl = firstElement(card, "a[href]");
+                    Element sourceEl = firstElement(card, "div.CEMjEf span", "span.WG9SHc", "div.CEMjEf");
+                    Element timeEl = firstElement(card, "div.OSrXXb span", "span.OSrXXb", "time");
+                    Element snippetEl = firstElement(card, "div.GI74Re", "div.Y3v8qd", "div", "span");
+
+                    String title = clean(titleEl != null ? titleEl.text() : "");
+                    String link = linkEl != null ? linkEl.absUrl("href") : "";
+                    String source = clean(sourceEl != null ? sourceEl.text() : "Google Search");
+                    String publishedAt = clean(timeEl != null ? timeEl.text() : "");
+                    String snippet = clean(snippetEl != null ? snippetEl.text() : "");
+
+                    if (!title.isBlank() && !link.isBlank()) {
+                        items.add(TrendNewsItem.builder()
+                                .trend(trend)
+                                .title(title)
+                                .link(link)
+                                .source(source)
+                                .publishedAt(publishedAt)
+                                .snippet(snippet)
+                                .build());
                         count++;
                     }
                 }
+
+                // Fallback generic extraction if Google markup changes.
+                if (count == 0) {
+                    Elements links = doc.select("a[href]");
+                    for (Element link : links) {
+                        if (count >= maxArticlesPerTrend) {
+                            break;
+                        }
+
+                        String href = link.absUrl("href");
+                        String title = clean(link.text());
+                        if (!href.isBlank() && href.startsWith("http") && title.length() > 20) {
+                            items.add(TrendNewsItem.builder()
+                                    .trend(trend)
+                                    .title(title)
+                                    .link(href)
+                                    .source("Google Search")
+                                    .publishedAt("")
+                                    .snippet("")
+                                    .build());
+                            count++;
+                        }
+                    }
+                }
             } catch (Exception ex) {
-                log.warn("Failed to collect news for trend {}: {}", trend, ex.getMessage());
+                log.warn("Failed to gather article details for trend {}: {}", trend, ex.getMessage());
             }
         }
 
-        return newsItems;
+        return items;
     }
 
     Map<String, String> generateArticleWithGoogleAi(List<String> trends, List<TrendNewsItem> newsItems) {
@@ -162,26 +212,23 @@ public class TrendArticleService {
             throw new IllegalStateException("Google AI API key is missing. Set careerpolitics.content.ai.google.api-key");
         }
 
-        String newsContext = newsItems.stream()
-                .map(item -> String.format("- Trend: %s | Headline: %s | Source: %s | Snippet: %s",
-                        item.getTrend(), item.getTitle(), item.getSource(), item.getSnippet()))
+        String scrapedDetails = newsItems.stream()
+                .map(item -> String.format("- Trend: %s | Title: %s | Source: %s | Link: %s | Snippet: %s",
+                        item.getTrend(), item.getTitle(), item.getSource(), item.getLink(), item.getSnippet()))
                 .collect(Collectors.joining("\n"));
 
-        String prompt = "You are a content strategist for CareerPolitics. Write a Forem-ready markdown article focused on trending topics in jobs and education in India. " +
-                "Use a practical, data-informed tone. Include: intro, trend analysis, opportunities for job seekers/students, and a conclusion with actionable advice. " +
-                "Also include a section `## Sources` with bullet links to the mentioned headlines. " +
+        String prompt = "Using the scraped trend topics and article details, write a Forem-ready markdown post for CareerPolitics. " +
+                "Focus on jobs and education opportunities in India. " +
+                "Structure: title, intro, trend-wise analysis, implications for students/job seekers, actionable steps, conclusion, and sources. " +
+                "Use factual tone and do not fabricate statistics. " +
                 "Return strict JSON with keys: title, markdown.\n\n" +
                 "Date: " + LocalDate.now() + "\n" +
                 "Trends: " + String.join(", ", trends) + "\n" +
-                "News:\n" + newsContext;
+                "Scraped details:\n" + scrapedDetails;
 
         Map<String, Object> body = Map.of(
-                "contents", List.of(Map.of(
-                        "parts", List.of(Map.of("text", prompt))
-                )),
-                "generationConfig", Map.of(
-                        "responseMimeType", "application/json"
-                )
+                "contents", List.of(Map.of("parts", List.of(Map.of("text", prompt)))),
+                "generationConfig", Map.of("responseMimeType", "application/json")
         );
 
         WebClient client = WebClient.builder()
@@ -225,7 +272,7 @@ public class TrendArticleService {
                 "tags", List.of("jobs", "education", "india", "trending")
         ));
         payload.put("meta", Map.of(
-                "source", "google-trends",
+                "source", "google-trends-page-scrape",
                 "trends", trends,
                 "headlines", newsItems.stream().map(TrendNewsItem::getTitle).toList()
         ));
@@ -248,6 +295,36 @@ public class TrendArticleService {
         } catch (Exception ex) {
             return Map.of("raw", response);
         }
+    }
+
+    private boolean isLikelyTrendTerm(String value) {
+        return value != null
+                && !value.isBlank()
+                && value.length() > 2
+                && value.length() < 120
+                && !value.equalsIgnoreCase("trending now")
+                && !value.equalsIgnoreCase("google trends")
+                && !value.toLowerCase(Locale.ROOT).startsWith("http");
+    }
+
+    private Element firstElement(Element base, String... selectors) {
+        for (String selector : selectors) {
+            Element found = base.selectFirst(selector);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            String cleaned = clean(value);
+            if (!cleaned.isBlank()) {
+                return cleaned;
+            }
+        }
+        return "";
     }
 
     private String clean(String value) {

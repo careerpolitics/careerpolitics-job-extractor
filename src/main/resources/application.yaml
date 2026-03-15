@@ -44,7 +44,7 @@ careerpolitics:
     max-image-size-kb: 500
   content:
     google-trends-url: https://trends.google.com/trending
-    google-news-rss-url: https://news.google.com/rss/search
+    google-search-url: https://www.google.com/search
     ai:
       google:
         base-url: https://generativelanguage.googleapis.com/v1beta
