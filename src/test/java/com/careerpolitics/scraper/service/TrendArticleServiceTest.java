@@ -64,4 +64,30 @@ class TrendArticleServiceTest {
         assertEquals("SBI PO Notification", trends.get(0));
         assertEquals("NEET UG 2026", trends.get(1));
     }
+    @Test
+    void parseNewsRssDocument_shouldExtractHeadlineDetails() {
+        TrendArticleService service = new TrendArticleService(new ObjectMapper());
+
+        String rss = """
+                <rss><channel>
+                  <item>
+                    <title>UPSC announces exam calendar</title>
+                    <link>https://example.com/upsc-calendar</link>
+                    <source>Example News</source>
+                    <pubDate>Sun, 16 Mar 2026 10:00:00 GMT</pubDate>
+                    <description><![CDATA[Important updates for aspirants.]]></description>
+                  </item>
+                </channel></rss>
+                """;
+
+        Document doc = Jsoup.parse(rss, "", org.jsoup.parser.Parser.xmlParser());
+        List<com.careerpolitics.scraper.model.response.TrendNewsItem> news = service.parseNewsRssDocument(doc, "UPSC", 3);
+
+        assertEquals(1, news.size());
+        assertEquals("UPSC", news.get(0).getTrend());
+        assertEquals("UPSC announces exam calendar", news.get(0).getTitle());
+        assertEquals("https://example.com/upsc-calendar", news.get(0).getLink());
+        assertEquals("Example News", news.get(0).getSource());
+    }
+
 }

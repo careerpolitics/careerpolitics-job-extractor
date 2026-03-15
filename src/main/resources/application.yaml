@@ -45,7 +45,7 @@ careerpolitics:
   content:
     google-trends-url: https://trends.google.com/trending
     google-trends-api-url: https://trends.google.com/trends/api
-    google-search-url: https://www.google.com/search
+    google-news-rss-url: https://news.google.com/rss/search
     ai:
       google:
         base-url: https://generativelanguage.googleapis.com/v1beta

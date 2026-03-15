@@ -40,9 +40,8 @@ public class TrendArticleService {
     @Value("${careerpolitics.content.google-trends-url:https://trends.google.com/trending}")
     private String googleTrendsUrl;
 
-    @Value("${careerpolitics.content.google-search-url:https://www.google.com/search}")
-    private String googleSearchUrl;
-
+    @Value("${careerpolitics.content.google-news-rss-url:https://news.google.com/rss/search}")
+    private String googleNewsRssUrl;
 
     @Value("${careerpolitics.content.google-trends-api-url:https://trends.google.com/trends/api}")
     private String googleTrendsApiUrl;
@@ -212,78 +211,90 @@ public class TrendArticleService {
 
         for (String trend : trends) {
             try {
-                String query = trend + " jobs education " + geo;
-                String url = googleSearchUrl + "?q=" + urlEncode(query) + "&tbm=nws&hl=" + urlEncode(language) + "&gl=" + urlEncode(geo);
+                String rssUrl = googleNewsRssUrl
+                        + "?q=" + urlEncode(trend + " jobs education " + geo)
+                        + "&hl=" + urlEncode(language)
+                        + "&gl=" + urlEncode(geo)
+                        + "&ceid=" + urlEncode(geo + ":en");
 
-                Document doc = Jsoup.connect(url)
+                Document rssDoc = Jsoup.connect(rssUrl)
+                        .ignoreContentType(true)
                         .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                        .referrer("https://www.google.com/")
                         .timeout(15000)
                         .get();
 
-                // Google News search result cards (best-effort selectors)
-                Elements cards = doc.select("div.SoaBEf, div.dbsr, g-card");
-                int count = 0;
-
-                for (Element card : cards) {
-                    if (count >= maxArticlesPerTrend) {
-                        break;
-                    }
-
-                    Element titleEl = firstElement(card, "div.n0jPhd", "div.JheGif", "h3", "a > div");
-                    Element linkEl = firstElement(card, "a[href]");
-                    Element sourceEl = firstElement(card, "div.CEMjEf span", "span.WG9SHc", "div.CEMjEf");
-                    Element timeEl = firstElement(card, "div.OSrXXb span", "span.OSrXXb", "time");
-                    Element snippetEl = firstElement(card, "div.GI74Re", "div.Y3v8qd", "div", "span");
-
-                    String title = clean(titleEl != null ? titleEl.text() : "");
-                    String link = linkEl != null ? linkEl.absUrl("href") : "";
-                    String source = clean(sourceEl != null ? sourceEl.text() : "Google Search");
-                    String publishedAt = clean(timeEl != null ? timeEl.text() : "");
-                    String snippet = clean(snippetEl != null ? snippetEl.text() : "");
-
-                    if (!title.isBlank() && !link.isBlank()) {
-                        items.add(TrendNewsItem.builder()
-                                .trend(trend)
-                                .title(title)
-                                .link(link)
-                                .source(source)
-                                .publishedAt(publishedAt)
-                                .snippet(snippet)
-                                .build());
-                        count++;
-                    }
-                }
-
-                // Fallback generic extraction if Google markup changes.
-                if (count == 0) {
-                    Elements links = doc.select("a[href]");
-                    for (Element link : links) {
-                        if (count >= maxArticlesPerTrend) {
-                            break;
-                        }
-
-                        String href = link.absUrl("href");
-                        String title = clean(link.text());
-                        if (!href.isBlank() && href.startsWith("http") && title.length() > 20) {
-                            items.add(TrendNewsItem.builder()
-                                    .trend(trend)
-                                    .title(title)
-                                    .link(href)
-                                    .source("Google Search")
-                                    .publishedAt("")
-                                    .snippet("")
-                                    .build());
-                            count++;
-                        }
-                    }
-                }
+                items.addAll(parseNewsRssDocument(rssDoc, trend, maxArticlesPerTrend));
             } catch (Exception ex) {
-                log.warn("Failed to gather article details for trend {}: {}", trend, ex.getMessage());
+                log.warn("Failed to gather article details from Google News RSS for trend {}: {}", trend, ex.getMessage());
             }
         }
 
         return items;
+    }
+
+    List<TrendNewsItem> parseNewsRssDocument(Document rssDoc, String trend, int maxArticlesPerTrend) {
+        List<TrendNewsItem> parsedItems = new ArrayList<>();
+        Elements rssItems = rssDoc.select("item");
+
+        for (Element item : rssItems) {
+            if (parsedItems.size() >= maxArticlesPerTrend) {
+                break;
+            }
+
+            String title = clean(textOf(item, "title"));
+            String link = clean(textOf(item, "link"));
+            String source = clean(textOf(item, "source"));
+            String publishedAt = clean(textOf(item, "pubDate"));
+            String description = clean(Jsoup.parse(textOf(item, "description")).text());
+
+            if (title.isBlank() || link.isBlank()) {
+                continue;
+            }
+
+            String snippet = description;
+            if (snippet.isBlank()) {
+                snippet = fetchArticleSnippet(link);
+            }
+
+            parsedItems.add(TrendNewsItem.builder()
+                    .trend(trend)
+                    .title(title)
+                    .link(link)
+                    .source(source.isBlank() ? "Google News RSS" : source)
+                    .publishedAt(publishedAt)
+                    .snippet(snippet)
+                    .build());
+        }
+
+        return parsedItems;
+    }
+
+    String fetchArticleSnippet(String link) {
+        try {
+            Document articleDoc = Jsoup.connect(link)
+                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    .timeout(10000)
+                    .get();
+
+            String metaDescription = firstNonBlank(
+                    articleDoc.select("meta[name=description]").attr("content"),
+                    articleDoc.select("meta[property=og:description]").attr("content")
+            );
+            if (!metaDescription.isBlank()) {
+                return clean(metaDescription);
+            }
+
+            Element firstParagraph = articleDoc.selectFirst("article p, main p, p");
+            return clean(firstParagraph != null ? firstParagraph.text() : "");
+        } catch (Exception ex) {
+            log.debug("Could not fetch article snippet for {}: {}", link, ex.getMessage());
+            return "";
+        }
+    }
+
+    private String textOf(Element parent, String selector) {
+        Element found = parent.selectFirst(selector);
+        return found != null ? found.text() : "";
     }
 
     Map<String, String> generateArticleWithGoogleAi(List<String> trends, List<TrendNewsItem> newsItems) {
