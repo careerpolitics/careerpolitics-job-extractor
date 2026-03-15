@@ -42,8 +42,8 @@ public class TrendArticleService {
     @Value("${careerpolitics.content.google-trends-url:https://trends.google.com/trending}")
     private String googleTrendsUrl;
 
-    @Value("${careerpolitics.content.google-news-rss-url:https://news.google.com/rss/search}")
-    private String googleNewsRssUrl;
+    @Value("${careerpolitics.content.google-news-url:https://news.google.com/search}")
+    private String googleNewsUrl;
 
     @Value("${careerpolitics.content.google-trends-api-url:https://trends.google.com/trends/api}")
     private String googleTrendsApiUrl;
@@ -225,15 +225,21 @@ public class TrendArticleService {
     }
 
     List<TrendNewsItem> gatherDetailsForTrend(String trend, int maxArticlesPerTrend, String geo, String language) {
-        String rssUrl = googleNewsRssUrl + "?q=" + urlEncode(trend + " jobs education " + geo)
-                + "&hl=" + urlEncode(language) + "&gl=" + urlEncode(geo) + "&ceid=" + urlEncode(geo + ":en");
+        String newsSearchUrl = googleNewsUrl
+                + "?q=" + urlEncode(trend + " jobs education " + geo)
+                + "&hl=" + urlEncode(language)
+                + "&gl=" + urlEncode(geo)
+                + "&ceid=" + urlEncode(geo + ":en");
 
         try {
-            log.debug("Fetching RSS for trend {}: {}", trend, rssUrl);
-            Document rssDoc = Jsoup.connect(rssUrl).ignoreContentType(true).userAgent("Mozilla/5.0").timeout(15000).get();
-            List<TrendNewsItem> items = parseNewsRssDocument(rssDoc, trend, Math.max(6, maxArticlesPerTrend));
+            log.debug("Scraping Google News for trend {}: {}", trend, newsSearchUrl);
+            Document newsDoc = Jsoup.connect(newsSearchUrl)
+                    .userAgent("Mozilla/5.0")
+                    .timeout(15000)
+                    .get();
 
-            // Keep at least 3 distinct reliable sources when possible.
+            List<TrendNewsItem> items = parseGoogleNewsDocument(newsDoc, trend, Math.max(8, maxArticlesPerTrend));
+
             LinkedHashMap<String, TrendNewsItem> bySource = new LinkedHashMap<>();
             for (TrendNewsItem item : items) {
                 String sourceKey = clean(item.getSource()).toLowerCase(Locale.ROOT);
@@ -251,9 +257,79 @@ public class TrendArticleService {
             }
             return selected.stream().limit(maxArticlesPerTrend).toList();
         } catch (Exception ex) {
-            log.warn("Failed to gather article details from Google News RSS for trend {}: {}", trend, ex.getMessage());
+            log.warn("Failed to scrape Google News for trend {}: {}", trend, ex.getMessage());
             return List.of();
         }
+    }
+
+    List<TrendNewsItem> parseGoogleNewsDocument(Document newsDoc, String trend, int maxArticlesPerTrend) {
+        List<TrendNewsItem> parsedItems = new ArrayList<>();
+
+        Elements articles = newsDoc.select("article");
+        for (Element article : articles) {
+            if (parsedItems.size() >= maxArticlesPerTrend) {
+                break;
+            }
+
+            Element linkEl = firstElement(article, "a[href]");
+            String rawLink = linkEl != null ? linkEl.absUrl("href") : "";
+            String link = resolveOriginalNewsUrl(clean(rawLink));
+
+            String title = clean(firstNonBlank(
+                    textOf(article, "h3"),
+                    textOf(article, "h4"),
+                    linkEl != null ? linkEl.text() : ""
+            ));
+            String source = clean(firstNonBlank(
+                    textOf(article, "div[data-n-tid]"),
+                    textOf(article, "a[data-n-tid]"),
+                    textOf(article, "span"),
+                    "Google News"
+            ));
+            String publishedAt = clean(firstNonBlank(
+                    textOf(article, "time"),
+                    textOf(article, "span[datetime]"),
+                    textOf(article, "div[datetime]")
+            ));
+
+            if (title.isBlank() || link.isBlank()) {
+                continue;
+            }
+
+            String snippet = fetchArticleSnippet(link);
+            parsedItems.add(TrendNewsItem.builder()
+                    .trend(trend)
+                    .title(title)
+                    .link(link)
+                    .source(source)
+                    .publishedAt(publishedAt)
+                    .snippet(snippet)
+                    .build());
+        }
+
+        // Fallback if article selectors fail.
+        if (parsedItems.isEmpty()) {
+            Elements links = newsDoc.select("a[href]");
+            for (Element linkEl : links) {
+                if (parsedItems.size() >= maxArticlesPerTrend) {
+                    break;
+                }
+                String title = clean(linkEl.text());
+                String link = resolveOriginalNewsUrl(clean(linkEl.absUrl("href")));
+                if (title.length() > 20 && link.startsWith("http")) {
+                    parsedItems.add(TrendNewsItem.builder()
+                            .trend(trend)
+                            .title(title)
+                            .link(link)
+                            .source("Google News")
+                            .publishedAt("")
+                            .snippet(fetchArticleSnippet(link))
+                            .build());
+                }
+            }
+        }
+
+        return parsedItems;
     }
 
     List<TrendMediaItem> extractMediaFromNewsLinks(String trend, List<TrendNewsItem> newsItems) {
@@ -336,21 +412,23 @@ public class TrendArticleService {
     }
 
     List<TrendMediaItem> fetchSocialMediaFromNewsRss(String trend, String geo, String language) {
-        String rssUrl = googleNewsRssUrl + "?q=" + urlEncode(trend + " (twitter OR x.com)")
-                + "&hl=" + urlEncode(language) + "&gl=" + urlEncode(geo) + "&ceid=" + urlEncode(geo + ":en");
+        String newsSearchUrl = googleNewsUrl
+                + "?q=" + urlEncode(trend + " (twitter OR x.com)")
+                + "&hl=" + urlEncode(language)
+                + "&gl=" + urlEncode(geo)
+                + "&ceid=" + urlEncode(geo + ":en");
         try {
-            log.debug("Fetching RSS for trend {}: {}", trend, rssUrl);
-            Document rssDoc = Jsoup.connect(rssUrl).ignoreContentType(true).userAgent("Mozilla/5.0").timeout(15000).get();
-            Elements items = rssDoc.select("item");
+            Document newsDoc = Jsoup.connect(newsSearchUrl).userAgent("Mozilla/5.0").timeout(15000).get();
+            Elements links = newsDoc.select("a[href]");
             List<TrendMediaItem> media = new ArrayList<>();
-            for (Element item : items) {
+            for (Element linkEl : links) {
                 if (media.size() >= 2) break;
-                String link = resolveOriginalNewsUrl(clean(textOf(item, "link")));
+                String link = resolveOriginalNewsUrl(clean(linkEl.absUrl("href")));
                 if (link.contains("twitter.com") || link.contains("x.com")) {
                     media.add(TrendMediaItem.builder()
                             .trend(trend)
                             .type("social")
-                            .title(clean(textOf(item, "title")))
+                            .title(clean(linkEl.text()))
                             .url(link)
                             .embed(link)
                             .build());
@@ -360,33 +438,6 @@ public class TrendArticleService {
         } catch (Exception ex) {
             return List.of();
         }
-    }
-
-    List<TrendNewsItem> parseNewsRssDocument(Document rssDoc, String trend, int maxArticlesPerTrend) {
-        List<TrendNewsItem> parsedItems = new ArrayList<>();
-        Elements rssItems = rssDoc.select("item");
-
-        for (Element item : rssItems) {
-            if (parsedItems.size() >= maxArticlesPerTrend) break;
-            String title = clean(textOf(item, "title"));
-            String link = resolveOriginalNewsUrl(clean(textOf(item, "link")));
-            String source = clean(textOf(item, "source"));
-            String publishedAt = clean(textOf(item, "pubDate"));
-            String description = clean(Jsoup.parse(textOf(item, "description")).text());
-            if (title.isBlank() || link.isBlank()) continue;
-
-            String snippet = description.isBlank() ? fetchArticleSnippet(link) : description;
-            parsedItems.add(TrendNewsItem.builder()
-                    .trend(trend)
-                    .title(title)
-                    .link(link)
-                    .source(source.isBlank() ? "Google News RSS" : source)
-                    .publishedAt(publishedAt)
-                    .snippet(snippet)
-                    .build());
-        }
-
-        return parsedItems;
     }
 
     Map<String, Object> generateArticleWithClaudeViaOpenRouter(String trend, List<TrendNewsItem> newsItems, List<TrendMediaItem> mediaItems, String coverImage) {
