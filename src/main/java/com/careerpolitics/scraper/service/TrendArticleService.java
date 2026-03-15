@@ -30,6 +30,10 @@ import java.util.stream.Collectors;
 public class TrendArticleService {
 
     private static final Pattern CLEANER_PATTERN = Pattern.compile("\\s+");
+    private static final List<String> INVALID_TREND_TOKENS = List.of(
+            "go back", "home link", "explore link", "trending now link", "year in search link",
+            "home", "explore", "trending now", "year in search", "google trends"
+    );
 
     private final ObjectMapper objectMapper;
 
@@ -91,41 +95,73 @@ public class TrendArticleService {
     }
 
     List<String> fetchGoogleTrends(String geo, String language, int maxTrends) {
-        List<String> trends = new ArrayList<>();
+        String url = googleTrendsUrl + "?geo=" + urlEncode(geo) + "&hl=" + urlEncode(language) + "&category=9&status=active";
 
-        try {
-            String url = googleTrendsUrl + "?geo=" + urlEncode(geo) + "&hl=" + urlEncode(language) + "&category=9&status=active";
-            Document doc = Jsoup.connect(url)
-                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                    .timeout(15000)
-                    .get();
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            try {
+                Document doc = Jsoup.connect(url)
+                        .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                        .timeout(15000)
+                        .get();
 
-            // Prefer actual trend cells from Google Trends page.
-            Elements trendCandidates = doc.select(
-                    "div[aria-label] a, a[title], div[title], [data-term], [data-row-id], .mZ3RIc, .QNIh4d, .mM5pbd"
-            );
-
-            for (Element element : trendCandidates) {
-                String text = firstNonBlank(
-                        element.attr("data-term"),
-                        element.attr("title"),
-                        element.attr("aria-label"),
-                        element.text()
-                );
-
-                String cleaned = clean(text);
-                if (isLikelyTrendTerm(cleaned) && !trends.contains(cleaned)) {
-                    trends.add(cleaned);
+                List<String> trends = extractTrendsFromDocument(doc, maxTrends);
+                if (!trends.isEmpty()) {
+                    return trends;
                 }
-                if (trends.size() >= maxTrends) {
-                    break;
+
+                if (attempt < 3) {
+                    Thread.sleep(1200);
                 }
+            } catch (Exception ex) {
+                log.warn("Failed to scrape Google Trends page (attempt {}): {}", attempt, ex.getMessage());
             }
-        } catch (Exception ex) {
-            log.warn("Failed to scrape Google Trends page: {}", ex.getMessage());
         }
 
-        return trends.stream().limit(maxTrends).toList();
+        return List.of();
+    }
+
+    List<String> extractTrendsFromDocument(Document doc, int maxTrends) {
+        LinkedHashSet<String> trends = new LinkedHashSet<>();
+
+        // Primary extraction: trending rows/cells inside table structures.
+        Elements tableRows = doc.select("table tbody tr, table tr");
+        for (Element row : tableRows) {
+            String rowText = clean(row.text());
+            if (rowText.isBlank()) {
+                continue;
+            }
+
+            Element titleElement = firstElement(row,
+                    "td:nth-of-type(2)",
+                    "td:nth-of-type(1)",
+                    "a[title]",
+                    "a",
+                    "div[title]",
+                    "span");
+
+            String candidate = clean(titleElement != null ? titleElement.text() : rowText);
+            addIfValidTrend(candidate, trends, maxTrends);
+            if (trends.size() >= maxTrends) {
+                return new ArrayList<>(trends);
+            }
+        }
+
+        // Secondary extraction in main content region.
+        Elements trendCandidates = doc.select("main [data-row-id], main [data-term], main a[title], main div[title], main .mZ3RIc, main .QNIh4d, main .mM5pbd");
+        for (Element element : trendCandidates) {
+            String candidate = firstNonBlank(
+                    element.attr("data-term"),
+                    element.attr("title"),
+                    element.attr("aria-label"),
+                    element.text()
+            );
+            addIfValidTrend(candidate, trends, maxTrends);
+            if (trends.size() >= maxTrends) {
+                break;
+            }
+        }
+
+        return new ArrayList<>(trends);
     }
 
     List<TrendNewsItem> gatherDetailsForTrends(List<String> trends, int maxArticlesPerTrend, String geo, String language) {
@@ -298,13 +334,31 @@ public class TrendArticleService {
     }
 
     private boolean isLikelyTrendTerm(String value) {
-        return value != null
-                && !value.isBlank()
-                && value.length() > 2
-                && value.length() < 120
-                && !value.equalsIgnoreCase("trending now")
-                && !value.equalsIgnoreCase("google trends")
-                && !value.toLowerCase(Locale.ROOT).startsWith("http");
+        if (value == null) {
+            return false;
+        }
+
+        String normalized = clean(value).toLowerCase(Locale.ROOT);
+        if (normalized.isBlank() || normalized.length() < 3 || normalized.length() > 120) {
+            return false;
+        }
+        if (normalized.startsWith("http") || normalized.contains("/") || normalized.contains("@")) {
+            return false;
+        }
+        if (INVALID_TREND_TOKENS.stream().anyMatch(normalized::equals)) {
+            return false;
+        }
+        return INVALID_TREND_TOKENS.stream().noneMatch(normalized::contains);
+    }
+
+    private void addIfValidTrend(String candidate, LinkedHashSet<String> trends, int maxTrends) {
+        String cleaned = clean(candidate);
+        if (isLikelyTrendTerm(cleaned)) {
+            trends.add(cleaned);
+        }
+        while (trends.size() > maxTrends) {
+            trends.remove(trends.iterator().next());
+        }
     }
 
     private Element firstElement(Element base, String... selectors) {
