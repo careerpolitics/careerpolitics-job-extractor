@@ -34,7 +34,8 @@ public class TrendArticleService {
     private static final Pattern CLEANER_PATTERN = Pattern.compile("\\s+");
     private static final List<String> INVALID_TREND_TOKENS = List.of(
             "go back", "home link", "explore link", "trending now link", "year in search link",
-            "home", "explore", "trending now", "year in search", "google trends"
+            "home", "explore", "trending now", "year in search", "google trends",
+            "arrow_upward", "timelapse", "lasted", "searches"
     );
 
     private final ObjectMapper objectMapper;
@@ -139,21 +140,7 @@ public class TrendArticleService {
             return seleniumTrends;
         }
 
-        String url = googleTrendsUrl + "?geo=" + urlEncode(geo) + "&hl=" + urlEncode(language) + "&category=9&status=active";
-        for (int attempt = 1; attempt <= 3; attempt++) {
-            try {
-                Document doc = Jsoup.connect(url).userAgent("Mozilla/5.0").timeout(15000).get();
-                List<String> trends = extractTrendsFromDocument(doc, maxTrends);
-                if (!trends.isEmpty()) {
-                    log.info("Fetched {} trends from Google Trends page", trends.size());
-                    return trends;
-                }
-                if (attempt < 3) Thread.sleep(1200);
-            } catch (Exception ex) {
-                log.warn("Failed to scrape Google Trends page (attempt {}): {}", attempt, ex.getMessage());
-            }
-        }
-        log.warn("No trends fetched from Selenium or page scraping");
+        log.warn("No trends fetched from Selenium scraping");
         return List.of();
     }
 
@@ -191,19 +178,8 @@ public class TrendArticleService {
             return selectBalancedNewsItems(seleniumItems, maxArticlesPerTrend);
         }
 
-        try {
-            log.debug("Scraping Google Search News with Jsoup fallback for trend {}: {}", trend, newsSearchUrl);
-            Document newsDoc = Jsoup.connect(newsSearchUrl)
-                    .userAgent("Mozilla/5.0")
-                    .timeout(15000)
-                    .get();
-
-            List<TrendNewsItem> items = parseGoogleSearchNewsDocument(newsDoc, trend, Math.max(8, maxArticlesPerTrend));
-            return selectBalancedNewsItems(items, maxArticlesPerTrend);
-        } catch (Exception ex) {
-            log.warn("Failed to scrape Google Search news for trend {}: {}", trend, ex.getMessage());
-            return List.of();
-        }
+        log.warn("No news details fetched from Selenium for trend={}", trend);
+        return List.of();
     }
 
     private List<TrendNewsItem> selectBalancedNewsItems(List<TrendNewsItem> items, int maxArticlesPerTrend) {
@@ -690,9 +666,28 @@ public class TrendArticleService {
     }
 
     private void addIfValidTrend(String candidate, LinkedHashSet<String> trends, int maxTrends) {
-        String cleaned = clean(candidate);
+        String cleaned = normalizeTrendCandidate(candidate);
         if (isLikelyTrendTerm(cleaned)) trends.add(cleaned);
         while (trends.size() > maxTrends) trends.remove(trends.iterator().next());
+    }
+
+    private String normalizeTrendCandidate(String candidate) {
+        String cleaned = clean(candidate);
+        if (cleaned.isBlank()) {
+            return "";
+        }
+
+        String firstSegment = cleaned.split("[\u00b7|:]")[0];
+        String normalized = clean(firstSegment)
+                .replaceAll("(?i)\\b\\d+[+]?\\s*searches\\b", "")
+                .replaceAll("(?i)\\b\\d+[+]?\\b", "")
+                .replaceAll("(?i)\\barrow_upward\\b", "")
+                .replaceAll("(?i)\\btimelapse\\b", "")
+                .replaceAll("(?i)\\bLasted\\s+\\d+\\s*(hr|hrs|hour|hours)\\b", "")
+                .replaceAll("(?i)\\b\\d+\\s*(min|mins|minute|minutes|hr|hrs|hour|hours|day|days)\\s+ago\\b", "")
+                .replaceAll("\\b\\d+%\\b", "");
+
+        return clean(normalized);
     }
 
     private Element firstElement(Element base, String... selectors) {

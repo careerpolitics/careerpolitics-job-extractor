@@ -48,6 +48,27 @@ class TrendArticleServiceTest {
         assertFalse(trends.stream().anyMatch(t -> t.toLowerCase().contains("link")));
     }
 
+
+    @Test
+    void extractTrendsFromDocument_shouldRemoveTrendMetadataNoise() {
+        TrendArticleService service = new TrendArticleService(new ObjectMapper(), new SeleniumTrendScraper());
+
+        String html = """
+                <html><body><main>
+                  <table><tbody>
+                    <tr><td>1</td><td>rpsc 500+ searches · timelapse Lasted 1 hr · 11h ago</td></tr>
+                    <tr><td>2</td><td>banasthali vidyapith 500+ arrow_upward 50% 8 hours ago timelapse Lasted 1 hr</td></tr>
+                  </tbody></table>
+                </main></body></html>
+                """;
+
+        List<String> trends = service.extractTrendsFromDocument(Jsoup.parse(html), 5);
+
+        assertEquals(2, trends.size());
+        assertEquals("rpsc", trends.get(0).toLowerCase());
+        assertEquals("banasthali vidyapith", trends.get(1).toLowerCase());
+    }
+
     @Test
     void parseGoogleSearchNewsDocument_shouldExtractHeadlineDetails() {
         TrendArticleService service = new TrendArticleService(new ObjectMapper(), new SeleniumTrendScraper());
