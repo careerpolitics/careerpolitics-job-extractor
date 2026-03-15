@@ -42,8 +42,8 @@ public class TrendArticleService {
     @Value("${careerpolitics.content.google-trends-url:https://trends.google.com/trending}")
     private String googleTrendsUrl;
 
-    @Value("${careerpolitics.content.google-news-url:https://news.google.com/search}")
-    private String googleNewsUrl;
+    @Value("${careerpolitics.content.google-search-url:https://www.google.com/search}")
+    private String googleSearchUrl;
 
     @Value("${careerpolitics.content.google-trends-api-url:https://trends.google.com/trends/api}")
     private String googleTrendsApiUrl;
@@ -225,20 +225,19 @@ public class TrendArticleService {
     }
 
     List<TrendNewsItem> gatherDetailsForTrend(String trend, int maxArticlesPerTrend, String geo, String language) {
-        String newsSearchUrl = googleNewsUrl
+        String newsSearchUrl = googleSearchUrl
                 + "?q=" + urlEncode(trend + " jobs education " + geo)
-                + "&hl=" + urlEncode(language)
-                + "&gl=" + urlEncode(geo)
-                + "&ceid=" + urlEncode(geo + ":en");
+                + "&tbm=nws&hl=" + urlEncode(language)
+                + "&gl=" + urlEncode(geo);
 
         try {
-            log.debug("Scraping Google News for trend {}: {}", trend, newsSearchUrl);
+            log.debug("Scraping Google Search News for trend {}: {}", trend, newsSearchUrl);
             Document newsDoc = Jsoup.connect(newsSearchUrl)
                     .userAgent("Mozilla/5.0")
                     .timeout(15000)
                     .get();
 
-            List<TrendNewsItem> items = parseGoogleNewsDocument(newsDoc, trend, Math.max(8, maxArticlesPerTrend));
+            List<TrendNewsItem> items = parseGoogleSearchNewsDocument(newsDoc, trend, Math.max(8, maxArticlesPerTrend));
 
             LinkedHashMap<String, TrendNewsItem> bySource = new LinkedHashMap<>();
             for (TrendNewsItem item : items) {
@@ -257,15 +256,15 @@ public class TrendArticleService {
             }
             return selected.stream().limit(maxArticlesPerTrend).toList();
         } catch (Exception ex) {
-            log.warn("Failed to scrape Google News for trend {}: {}", trend, ex.getMessage());
+            log.warn("Failed to scrape Google Search news for trend {}: {}", trend, ex.getMessage());
             return List.of();
         }
     }
 
-    List<TrendNewsItem> parseGoogleNewsDocument(Document newsDoc, String trend, int maxArticlesPerTrend) {
+    List<TrendNewsItem> parseGoogleSearchNewsDocument(Document newsDoc, String trend, int maxArticlesPerTrend) {
         List<TrendNewsItem> parsedItems = new ArrayList<>();
 
-        Elements articles = newsDoc.select("article");
+        Elements articles = newsDoc.select("div.SoaBEf, div.dbsr, g-card, article");
         for (Element article : articles) {
             if (parsedItems.size() >= maxArticlesPerTrend) {
                 break;
@@ -276,15 +275,18 @@ public class TrendArticleService {
             String link = resolveOriginalNewsUrl(clean(rawLink));
 
             String title = clean(firstNonBlank(
+                    textOf(article, "div.n0jPhd"),
+                    textOf(article, "div.JheGif"),
                     textOf(article, "h3"),
                     textOf(article, "h4"),
                     linkEl != null ? linkEl.text() : ""
             ));
             String source = clean(firstNonBlank(
+                    textOf(article, "div.CEMjEf span"),
+                    textOf(article, "span.WG9SHc"),
                     textOf(article, "div[data-n-tid]"),
                     textOf(article, "a[data-n-tid]"),
-                    textOf(article, "span"),
-                    "Google News"
+                    "Google Search"
             ));
             String publishedAt = clean(firstNonBlank(
                     textOf(article, "time"),
@@ -321,7 +323,7 @@ public class TrendArticleService {
                             .trend(trend)
                             .title(title)
                             .link(link)
-                            .source("Google News")
+                            .source("Google Search")
                             .publishedAt("")
                             .snippet(fetchArticleSnippet(link))
                             .build());
@@ -412,11 +414,10 @@ public class TrendArticleService {
     }
 
     List<TrendMediaItem> fetchSocialMediaFromNewsRss(String trend, String geo, String language) {
-        String newsSearchUrl = googleNewsUrl
+        String newsSearchUrl = googleSearchUrl
                 + "?q=" + urlEncode(trend + " (twitter OR x.com)")
-                + "&hl=" + urlEncode(language)
-                + "&gl=" + urlEncode(geo)
-                + "&ceid=" + urlEncode(geo + ":en");
+                + "&tbm=nws&hl=" + urlEncode(language)
+                + "&gl=" + urlEncode(geo);
         try {
             Document newsDoc = Jsoup.connect(newsSearchUrl).userAgent("Mozilla/5.0").timeout(15000).get();
             Elements links = newsDoc.select("a[href]");

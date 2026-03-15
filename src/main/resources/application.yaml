@@ -45,7 +45,7 @@ careerpolitics:
   content:
     google-trends-url: https://trends.google.com/trending
     google-trends-api-url: https://trends.google.com/trends/api
-    google-news-url: https://news.google.com/search
+    google-search-url: https://www.google.com/search
     youtube-rss-url: https://www.youtube.com/feeds/videos.xml
     ai:
       openrouter:

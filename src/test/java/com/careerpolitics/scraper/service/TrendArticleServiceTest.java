@@ -65,22 +65,22 @@ class TrendArticleServiceTest {
         assertEquals("NEET UG 2026", trends.get(1));
     }
     @Test
-    void parseGoogleNewsDocument_shouldExtractHeadlineDetails() {
+    void parseGoogleSearchNewsDocument_shouldExtractHeadlineDetails() {
         TrendArticleService service = new TrendArticleService(new ObjectMapper());
 
         String html = """
                 <html><body>
-                  <article>
+                  <div class='SoaBEf'>
                     <a href='https://news.google.com/articles/abc?url=https%3A%2F%2Fexample.com%2Fupsc-story'>Read</a>
-                    <h3>UPSC announces exam calendar</h3>
-                    <div data-n-tid='source'>Example News</div>
+                    <div class='n0jPhd'>UPSC announces exam calendar</div>
+                    <div class='CEMjEf'><span>Example News</span></div>
                     <time>2 hours ago</time>
-                  </article>
+                  </div>
                 </body></html>
                 """;
 
         Document doc = Jsoup.parse(html, "https://news.google.com");
-        List<com.careerpolitics.scraper.model.response.TrendNewsItem> news = service.parseGoogleNewsDocument(doc, "UPSC", 3);
+        List<com.careerpolitics.scraper.model.response.TrendNewsItem> news = service.parseGoogleSearchNewsDocument(doc, "UPSC", 3);
 
         assertEquals(1, news.size());
         assertEquals("UPSC", news.get(0).getTrend());
