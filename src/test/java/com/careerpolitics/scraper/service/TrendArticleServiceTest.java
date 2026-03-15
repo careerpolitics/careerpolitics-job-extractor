@@ -94,10 +94,10 @@ class TrendArticleServiceTest {
     void normalizeTag_shouldConvertToAsciiSlug() {
         TrendArticleService service = new TrendArticleService(new ObjectMapper());
 
-        assertEquals("rrb-clerk", service.normalizeTag("rrb clerk"));
-        assertEquals("mains-result", service.normalizeTag("mains result"));
-        assertEquals("banking-jobs", service.normalizeTag("banking jobs"));
-        assertEquals("upsc-2026", service.normalizeTag("UPSC 2026"));
+        assertEquals("rrbclerk", service.normalizeTag("rrb clerk"));
+        assertEquals("mainsresult", service.normalizeTag("mains result"));
+        assertEquals("bankingjobs", service.normalizeTag("banking jobs"));
+        assertEquals("upsc2026", service.normalizeTag("UPSC 2026"));
     }
 
 }

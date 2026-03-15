@@ -473,13 +473,9 @@ public class TrendArticleService {
     }
 
     String normalizeTag(String tag) {
-        String normalized = clean(tag)
+        return clean(tag)
                 .toLowerCase(Locale.ROOT)
-                .replaceAll("[^a-z0-9\s-]", "")
-                .replaceAll("\s+", "-")
-                .replaceAll("-+", "-")
-                .replaceAll("(^-|-$)", "");
-        return normalized;
+                .replaceAll("[^a-z0-9]", "");
     }
 
     private String buildDescription(String trend, List<TrendNewsItem> newsItems) {
