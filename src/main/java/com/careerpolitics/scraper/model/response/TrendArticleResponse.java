@@ -11,6 +11,9 @@ import java.util.Map;
 public class TrendArticleResponse {
     private List<String> trends;
     private List<TrendNewsItem> news;
+    private List<TrendGeneratedArticle> articles;
+
+    // Backward-compatible single-article fields (mirrors first generated article when present)
     private String generatedTitle;
     private String generatedMarkdown;
     private boolean published;

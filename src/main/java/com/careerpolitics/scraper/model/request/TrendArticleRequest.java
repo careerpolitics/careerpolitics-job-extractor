@@ -8,7 +8,7 @@ import lombok.Data;
 import java.util.List;
 
 @Data
-@Schema(description = "Request for generating a jobs and education trend article")
+@Schema(description = "Request for generating detailed jobs and education articles for each trend")
 public class TrendArticleRequest {
 
     @Schema(description = "Country/region code for Google Trends", example = "IN", defaultValue = "IN")
