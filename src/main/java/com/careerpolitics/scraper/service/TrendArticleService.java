@@ -49,14 +49,14 @@ public class TrendArticleService {
     @Value("${careerpolitics.content.youtube-rss-url:https://www.youtube.com/feeds/videos.xml}")
     private String youtubeRssUrl;
 
-    @Value("${careerpolitics.content.ai.google.base-url:https://generativelanguage.googleapis.com/v1beta}")
-    private String googleAiBaseUrl;
+    @Value("${careerpolitics.content.ai.openrouter.base-url:https://openrouter.ai/api/v1}")
+    private String openRouterBaseUrl;
 
-    @Value("${careerpolitics.content.ai.google.model:gemini-1.5-flash}")
-    private String googleAiModel;
+    @Value("${careerpolitics.content.ai.openrouter.model:anthropic/claude-3.5-sonnet}")
+    private String openRouterModel;
 
-    @Value("${careerpolitics.content.ai.google.api-key:}")
-    private String googleAiApiKey;
+    @Value("${careerpolitics.content.ai.openrouter.api-key:}")
+    private String openRouterApiKey;
 
     @Value("${careerpolitics.content.article-api.url:}")
     private String articleApiUrl;
@@ -87,7 +87,7 @@ public class TrendArticleService {
             mediaItems = mediaItems.stream().distinct().limit(8).toList();
             String coverImage = pickCoverImage(mediaItems);
 
-            Map<String, Object> articleData = generateArticleWithGoogleAi(trend, newsItems, mediaItems, coverImage);
+            Map<String, Object> articleData = generateArticleWithClaudeViaOpenRouter(trend, newsItems, mediaItems, coverImage);
 
             @SuppressWarnings("unchecked")
             List<String> tags = (List<String>) articleData.getOrDefault("tags", defaultTagsForTrend(trend));
@@ -374,9 +374,9 @@ public class TrendArticleService {
         return parsedItems;
     }
 
-    Map<String, Object> generateArticleWithGoogleAi(String trend, List<TrendNewsItem> newsItems, List<TrendMediaItem> mediaItems, String coverImage) {
-        if (googleAiApiKey == null || googleAiApiKey.isBlank()) {
-            throw new IllegalStateException("Google AI API key is missing. Set careerpolitics.content.ai.google.api-key");
+    Map<String, Object> generateArticleWithClaudeViaOpenRouter(String trend, List<TrendNewsItem> newsItems, List<TrendMediaItem> mediaItems, String coverImage) {
+        if (openRouterApiKey == null || openRouterApiKey.isBlank()) {
+            throw new IllegalStateException("OpenRouter API key is missing. Set careerpolitics.content.ai.openrouter.api-key");
         }
 
         String sourcesText = newsItems.stream().map(n -> "- " + n.getTitle() + " | " + n.getSource() + " | " + n.getLink() + " | " + n.getSnippet())
@@ -395,24 +395,29 @@ public class TrendArticleService {
                 "Cover image: " + (coverImage == null ? "" : coverImage) + "\n\n" +
                 "News sources:\n" + sourcesText + "\n\nMedia candidates:\n" + mediaText;
 
-        Map<String, Object> body = Map.of(
-                "contents", List.of(Map.of("parts", List.of(Map.of("text", prompt)))),
-                "generationConfig", Map.of("responseMimeType", "application/json")
-        );
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("model", openRouterModel);
+        body.put("messages", List.of(
+                Map.of("role", "system", "content", "You are an expert journalist and SEO editor. Always return valid JSON only."),
+                Map.of("role", "user", "content", prompt)
+        ));
 
-        String raw = WebClient.builder().baseUrl(googleAiBaseUrl)
+        String raw = WebClient.builder().baseUrl(openRouterBaseUrl)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + openRouterApiKey)
+                .defaultHeader("HTTP-Referer", "https://careerpolitics.com")
+                .defaultHeader("X-Title", "CareerPolitics Trend Article Writer")
                 .build()
                 .post()
-                .uri(uriBuilder -> uriBuilder.path("/models/{model}:generateContent").queryParam("key", googleAiApiKey).build(googleAiModel))
+                .uri("/chat/completions")
                 .bodyValue(body)
                 .retrieve()
                 .bodyToMono(String.class)
                 .block();
 
         try {
-            String content = objectMapper.readTree(raw).path("candidates").path(0).path("content").path("parts").path(0).path("text").asText();
-            JsonNode parsed = objectMapper.readTree(content);
+            String content = objectMapper.readTree(raw).path("choices").path(0).path("message").path("content").asText();
+            JsonNode parsed = objectMapper.readTree(extractJsonObject(content));
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("title", parsed.path("title").asText(trend + " - Latest Jobs & Education Update"));
             result.put("markdown", parsed.path("markdown").asText(""));
@@ -420,7 +425,7 @@ public class TrendArticleService {
             result.put("keywords", toStringList(parsed.path("keywords"), defaultKeywordsForTrend(trend)));
             return result;
         } catch (Exception ex) {
-            throw new IllegalStateException("Failed to parse Google AI response", ex);
+            throw new IllegalStateException("Failed to parse Claude/OpenRouter response", ex);
         }
     }
 
@@ -633,6 +638,22 @@ public class TrendArticleService {
             if (q > -1) videoId = videoId.substring(0, q);
         }
         return videoId.isBlank() ? url : "https://www.youtube.com/embed/" + videoId;
+    }
+
+    private String extractJsonObject(String text) {
+        if (text == null) {
+            return "{}";
+        }
+        String trimmed = text.trim();
+        if (trimmed.startsWith("```")) {
+            trimmed = trimmed.replaceAll("^```json", "").replaceAll("^```", "").replaceAll("```$", "").trim();
+        }
+        int start = trimmed.indexOf('{');
+        int end = trimmed.lastIndexOf('}');
+        if (start >= 0 && end > start) {
+            return trimmed.substring(start, end + 1);
+        }
+        return trimmed;
     }
 
     private String urlEncode(String value) {

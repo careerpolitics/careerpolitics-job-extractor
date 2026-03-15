@@ -48,10 +48,10 @@ careerpolitics:
     google-news-rss-url: https://news.google.com/rss/search
     youtube-rss-url: https://www.youtube.com/feeds/videos.xml
     ai:
-      google:
-        base-url: https://generativelanguage.googleapis.com/v1beta
-        model: gemini-1.5-flash
-        api-key: ${GOOGLE_AI_API_KEY:}
+      openrouter:
+        base-url: https://openrouter.ai/api/v1
+        model: anthropic/claude-3.5-sonnet
+        api-key: ${OPENROUTER_API_KEY:}
     article-api:
       url: ${CAREERPOLITICS_ARTICLE_API_URL:}
       token: ${CAREERPOLITICS_ARTICLE_API_TOKEN:}
