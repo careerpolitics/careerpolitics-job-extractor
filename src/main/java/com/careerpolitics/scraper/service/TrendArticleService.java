@@ -458,7 +458,7 @@ public class TrendArticleService {
         List<String> source = (tags == null || tags.isEmpty()) ? List.of("trending", "jobs", "education", "india") : tags;
         LinkedHashSet<String> cleaned = new LinkedHashSet<>();
         for (String tag : source) {
-            String normalized = clean(tag).toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9- ]", "").trim();
+            String normalized = normalizeTag(tag);
             if (!normalized.isBlank()) {
                 cleaned.add(normalized.length() > 30 ? normalized.substring(0, 30) : normalized);
             }
@@ -470,6 +470,16 @@ public class TrendArticleService {
             cleaned.addAll(List.of("trending", "jobs", "education", "india"));
         }
         return new ArrayList<>(cleaned);
+    }
+
+    String normalizeTag(String tag) {
+        String normalized = clean(tag)
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9\s-]", "")
+                .replaceAll("\s+", "-")
+                .replaceAll("-+", "-")
+                .replaceAll("(^-|-$)", "");
+        return normalized;
     }
 
     private String buildDescription(String trend, List<TrendNewsItem> newsItems) {
