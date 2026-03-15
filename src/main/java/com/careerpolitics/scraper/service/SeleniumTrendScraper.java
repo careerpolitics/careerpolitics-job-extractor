@@ -24,6 +24,9 @@ public class SeleniumTrendScraper {
     @Value("${careerpolitics.content.selenium.timeout-seconds:20}")
     private int timeoutSeconds;
 
+    @Value("${careerpolitics.content.selenium.news-enabled:true}")
+    private boolean seleniumNewsEnabled;
+
     public List<String> scrapeTrends(String trendsUrl, String geo, String language, int maxTrends, TrendArticleService extractor) {
         if (!seleniumEnabled) {
             return List.of();
@@ -71,6 +74,59 @@ public class SeleniumTrendScraper {
             return List.of();
         } catch (Exception ex) {
             log.warn("Selenium trends scrape failed: {}", ex.getMessage());
+            return List.of();
+        } finally {
+            if (driver != null) {
+                try {
+                    driver.quit();
+                } catch (Exception ignored) {
+                }
+            }
+        }
+    }
+
+    public List<TrendNewsItem> scrapeGoogleSearchNews(String searchUrl, String trend, int maxArticlesPerTrend, TrendArticleService extractor) {
+        if (!seleniumEnabled || !seleniumNewsEnabled) {
+            return List.of();
+        }
+
+        WebDriver driver = null;
+        try {
+            WebDriverManager.chromedriver().setup();
+
+            ChromeOptions options = new ChromeOptions();
+            options.addArguments("--headless=new", "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu");
+            options.addArguments("--window-size=1920,1080");
+            driver = new ChromeDriver(options);
+
+            for (int attempt = 1; attempt <= 3; attempt++) {
+                driver.get(searchUrl);
+
+                new WebDriverWait(driver, Duration.ofSeconds(Math.max(8, timeoutSeconds)))
+                        .until(d -> d.getPageSource() != null && d.getPageSource().contains("<body"));
+
+                new WebDriverWait(driver, Duration.ofSeconds(Math.max(8, timeoutSeconds)))
+                        .until(d -> !d.findElements(By.cssSelector("div.SoaBEf, div.dbsr, g-card, article")).isEmpty());
+
+                if (driver instanceof JavascriptExecutor js) {
+                    js.executeScript("window.scrollTo(0, document.body.scrollHeight * 0.75);");
+                    Thread.sleep(1000);
+                }
+
+                String html = driver.getPageSource();
+                List<TrendNewsItem> newsItems = extractor.parseGoogleSearchNewsDocument(Jsoup.parse(html), trend, maxArticlesPerTrend);
+                if (!newsItems.isEmpty()) {
+                    log.info("Selenium Google Search news scrape returned {} items for trend={} on attempt {}", newsItems.size(), trend, attempt);
+                    return newsItems;
+                }
+
+                log.warn("Selenium Google Search news scrape attempt {} returned 0 items for trend={}", attempt, trend);
+                Thread.sleep(1200);
+            }
+
+            return List.of();
+        } catch (Exception ex) {
+            log.warn("Selenium Google Search news scrape failed for trend={}: {}", trend, ex.getMessage());
             return List.of();
         } finally {
             if (driver != null) {

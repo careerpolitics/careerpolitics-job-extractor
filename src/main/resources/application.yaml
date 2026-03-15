@@ -48,6 +48,7 @@ careerpolitics:
     youtube-rss-url: https://www.youtube.com/feeds/videos.xml
     selenium:
       enabled: ${SELENIUM_ENABLED:true}
+      news-enabled: ${SELENIUM_NEWS_ENABLED:true}
       timeout-seconds: ${SELENIUM_TIMEOUT_SECONDS:20}
     ai:
       openrouter:

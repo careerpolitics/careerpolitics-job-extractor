@@ -180,35 +180,61 @@ public class TrendArticleService {
                 + "&tbm=nws&hl=" + urlEncode(language)
                 + "&gl=" + urlEncode(geo);
 
+        List<TrendNewsItem> seleniumItems = seleniumTrendScraper.scrapeGoogleSearchNews(
+                newsSearchUrl,
+                trend,
+                Math.max(8, maxArticlesPerTrend),
+                this
+        );
+        if (!seleniumItems.isEmpty()) {
+            log.info("Using Selenium Google Search news results for trend={} count={}", trend, seleniumItems.size());
+            return selectBalancedNewsItems(seleniumItems, maxArticlesPerTrend);
+        }
+
         try {
-            log.debug("Scraping Google Search News for trend {}: {}", trend, newsSearchUrl);
+            log.debug("Scraping Google Search News with Jsoup fallback for trend {}: {}", trend, newsSearchUrl);
             Document newsDoc = Jsoup.connect(newsSearchUrl)
                     .userAgent("Mozilla/5.0")
                     .timeout(15000)
                     .get();
 
             List<TrendNewsItem> items = parseGoogleSearchNewsDocument(newsDoc, trend, Math.max(8, maxArticlesPerTrend));
-
-            LinkedHashMap<String, TrendNewsItem> bySource = new LinkedHashMap<>();
-            for (TrendNewsItem item : items) {
-                String sourceKey = clean(item.getSource()).toLowerCase(Locale.ROOT);
-                bySource.putIfAbsent(sourceKey, item);
-            }
-
-            List<TrendNewsItem> selected = new ArrayList<>();
-            for (TrendNewsItem uniqueSourceItem : bySource.values()) {
-                selected.add(uniqueSourceItem);
-                if (selected.size() >= 3) break;
-            }
-            for (TrendNewsItem item : items) {
-                if (selected.size() >= maxArticlesPerTrend) break;
-                if (!selected.contains(item)) selected.add(item);
-            }
-            return selected.stream().limit(maxArticlesPerTrend).toList();
+            return selectBalancedNewsItems(items, maxArticlesPerTrend);
         } catch (Exception ex) {
             log.warn("Failed to scrape Google Search news for trend {}: {}", trend, ex.getMessage());
             return List.of();
         }
+    }
+
+    private List<TrendNewsItem> selectBalancedNewsItems(List<TrendNewsItem> items, int maxArticlesPerTrend) {
+        if (items == null || items.isEmpty()) {
+            return List.of();
+        }
+
+        LinkedHashMap<String, TrendNewsItem> bySource = new LinkedHashMap<>();
+        for (TrendNewsItem item : items) {
+            String sourceKey = clean(item.getSource()).toLowerCase(Locale.ROOT);
+            bySource.putIfAbsent(sourceKey, item);
+        }
+
+        List<TrendNewsItem> selected = new ArrayList<>();
+        for (TrendNewsItem uniqueSourceItem : bySource.values()) {
+            selected.add(uniqueSourceItem);
+            if (selected.size() >= 3) {
+                break;
+            }
+        }
+
+        for (TrendNewsItem item : items) {
+            if (selected.size() >= maxArticlesPerTrend) {
+                break;
+            }
+            if (!selected.contains(item)) {
+                selected.add(item);
+            }
+        }
+
+        return selected.stream().limit(maxArticlesPerTrend).toList();
     }
 
     List<TrendNewsItem> parseGoogleSearchNewsDocument(Document newsDoc, String trend, int maxArticlesPerTrend) {

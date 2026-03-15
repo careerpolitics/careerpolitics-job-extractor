@@ -108,7 +108,8 @@ Example request:
 - `OPENROUTER_API_KEY` for Claude via OpenRouter article generation
 - `CAREERPOLITICS_ARTICLE_API_URL` for article publishing endpoint
 - `CAREERPOLITICS_ARTICLE_API_TOKEN` optional auth token sent as `api-key`
-- Optional: `SELENIUM_ENABLED` (default `true`) to enable Selenium trends scraping
+- Optional: `SELENIUM_ENABLED` (default `true`) to enable Selenium scraping
+- Optional: `SELENIUM_NEWS_ENABLED` (default `true`) to enable Selenium-based Google Search news scraping
 - Optional: `SELENIUM_TIMEOUT_SECONDS` (default `20`) for Selenium wait timeout
 - Optional: `careerpolitics.content.youtube-rss-url` for YouTube media discovery
 
