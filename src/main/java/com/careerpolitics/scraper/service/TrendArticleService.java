@@ -43,6 +43,10 @@ public class TrendArticleService {
     @Value("${careerpolitics.content.google-search-url:https://www.google.com/search}")
     private String googleSearchUrl;
 
+
+    @Value("${careerpolitics.content.google-trends-api-url:https://trends.google.com/trends/api}")
+    private String googleTrendsApiUrl;
+
     @Value("${careerpolitics.content.ai.google.base-url:https://generativelanguage.googleapis.com/v1beta}")
     private String googleAiBaseUrl;
 
@@ -117,48 +121,87 @@ public class TrendArticleService {
             }
         }
 
+        List<String> apiTrends = fetchTrendsFromApiEndpoints(geo, language, maxTrends);
+        if (!apiTrends.isEmpty()) {
+            log.info("Using Google Trends API fallback results, count={}", apiTrends.size());
+            return apiTrends;
+        }
+
         return List.of();
     }
 
-    List<String> extractTrendsFromDocument(Document doc, int maxTrends) {
+    List<String> fetchTrendsFromApiEndpoints(String geo, String language, int maxTrends) {
         LinkedHashSet<String> trends = new LinkedHashSet<>();
 
-        // Primary extraction: trending rows/cells inside table structures.
-        Elements tableRows = doc.select("table tbody tr, table tr");
-        for (Element row : tableRows) {
-            String rowText = clean(row.text());
-            if (rowText.isBlank()) {
-                continue;
-            }
+        List<String> endpoints = List.of(
+                googleTrendsApiUrl + "/realtimetrends?hl=" + urlEncode(language) + "&tz=-330&cat=all&fi=0&fs=0&geo=" + urlEncode(geo) + "&ri=300&rs=20&sort=0",
+                googleTrendsApiUrl + "/dailytrends?hl=" + urlEncode(language) + "&tz=-330&geo=" + urlEncode(geo) + "&ns=15"
+        );
 
-            Element titleElement = firstElement(row,
-                    "td:nth-of-type(2)",
-                    "td:nth-of-type(1)",
-                    "a[title]",
-                    "a",
-                    "div[title]",
-                    "span");
+        for (String endpoint : endpoints) {
+            try {
+                String raw = Jsoup.connect(endpoint)
+                        .ignoreContentType(true)
+                        .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                        .timeout(15000)
+                        .execute()
+                        .body();
 
-            String candidate = clean(titleElement != null ? titleElement.text() : rowText);
-            addIfValidTrend(candidate, trends, maxTrends);
-            if (trends.size() >= maxTrends) {
-                return new ArrayList<>(trends);
+                List<String> parsed = parseGoogleTrendsApiPayload(raw, maxTrends);
+                for (String trend : parsed) {
+                    addIfValidTrend(trend, trends, maxTrends);
+                    if (trends.size() >= maxTrends) {
+                        return new ArrayList<>(trends);
+                    }
+                }
+            } catch (Exception ex) {
+                log.warn("Failed trends API fallback call {}: {}", endpoint, ex.getMessage());
             }
         }
 
-        // Secondary extraction in main content region.
-        Elements trendCandidates = doc.select("main [data-row-id], main [data-term], main a[title], main div[title], main .mZ3RIc, main .QNIh4d, main .mM5pbd");
-        for (Element element : trendCandidates) {
-            String candidate = firstNonBlank(
-                    element.attr("data-term"),
-                    element.attr("title"),
-                    element.attr("aria-label"),
-                    element.text()
-            );
-            addIfValidTrend(candidate, trends, maxTrends);
-            if (trends.size() >= maxTrends) {
-                break;
+        return new ArrayList<>(trends);
+    }
+
+    List<String> parseGoogleTrendsApiPayload(String raw, int maxTrends) {
+        if (raw == null || raw.isBlank()) {
+            return List.of();
+        }
+
+        String sanitized = raw.startsWith(")]}'") ? raw.substring(4) : raw;
+
+        LinkedHashSet<String> trends = new LinkedHashSet<>();
+        try {
+            JsonNode root = objectMapper.readTree(sanitized).path("default");
+
+            JsonNode realtimeStories = root.path("trendingStories");
+            if (realtimeStories.isArray()) {
+                for (JsonNode story : realtimeStories) {
+                    String query = clean(story.path("title").path("query").asText());
+                    addIfValidTrend(query, trends, maxTrends);
+                    if (trends.size() >= maxTrends) {
+                        return new ArrayList<>(trends);
+                    }
+                }
             }
+
+            JsonNode dailyDays = root.path("trendingSearchesDays");
+            if (dailyDays.isArray()) {
+                for (JsonNode day : dailyDays) {
+                    JsonNode searches = day.path("trendingSearches");
+                    if (!searches.isArray()) {
+                        continue;
+                    }
+                    for (JsonNode search : searches) {
+                        String query = clean(search.path("title").path("query").asText());
+                        addIfValidTrend(query, trends, maxTrends);
+                        if (trends.size() >= maxTrends) {
+                            return new ArrayList<>(trends);
+                        }
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("Failed parsing Google Trends API payload: {}", ex.getMessage());
         }
 
         return new ArrayList<>(trends);

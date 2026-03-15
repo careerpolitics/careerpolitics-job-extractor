@@ -44,6 +44,7 @@ careerpolitics:
     max-image-size-kb: 500
   content:
     google-trends-url: https://trends.google.com/trending
+    google-trends-api-url: https://trends.google.com/trends/api
     google-search-url: https://www.google.com/search
     ai:
       google:

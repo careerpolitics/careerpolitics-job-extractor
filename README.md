@@ -83,7 +83,7 @@ Optional env vars:
 - For production, configure PostgreSQL datasource and Spring profiles
 ## Trending Jobs/Education Article Generation
 
-A new endpoint can discover Google Trends topics in India (jobs/education), scrape trending topics from Google Trends page, gather article details from Google Search News results, generate a Google AI (Gemini)-written Forem markdown article, and publish it to CareerPolitics article API.
+A new endpoint can discover Google Trends topics in India (jobs/education), scrape trending topics from Google Trends page (with Trends API fallback when page content is delayed), gather article details from Google Search News results, generate a Google AI (Gemini)-written Forem markdown article, and publish it to CareerPolitics article API.
 
 ### Endpoint
 `POST /api/careerpolitics/content/trends/article`
