@@ -83,7 +83,7 @@ Optional env vars:
 - For production, configure PostgreSQL datasource and Spring profiles
 ## Trending Jobs/Education Article Generation
 
-A new endpoint discovers Google Trends topics in India (jobs/education), researches each trend via Google Search news results from multiple sources, enriches context with media (photos/videos from source links + YouTube/social links), auto-selects a cover image when available, and generates a detailed Claude via OpenRouter markdown article for **each** trend topic. Optionally, each generated article is published to the CareerPolitics article API.
+A new endpoint discovers Google Trends topics in India (jobs/education), researches each trend via Google Trends (Selenium-driven dynamic scrape) and Google Search news results from multiple sources, enriches context with media (photos/videos from source links + YouTube/social links), auto-selects a cover image when available, and generates a detailed Claude via OpenRouter markdown article for **each** trend topic. Optionally, each generated article is published to the CareerPolitics article API.
 
 ### Endpoint
 `POST /api/careerpolitics/content/trends/article`
@@ -108,6 +108,8 @@ Example request:
 - `OPENROUTER_API_KEY` for Claude via OpenRouter article generation
 - `CAREERPOLITICS_ARTICLE_API_URL` for article publishing endpoint
 - `CAREERPOLITICS_ARTICLE_API_TOKEN` optional auth token sent as `api-key`
+- Optional: `SELENIUM_ENABLED` (default `true`) to enable Selenium trends scraping
+- Optional: `SELENIUM_TIMEOUT_SECONDS` (default `20`) for Selenium wait timeout
 - Optional: `careerpolitics.content.youtube-rss-url` for YouTube media discovery
 
 ### Notes

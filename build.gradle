@@ -35,6 +35,11 @@ dependencies {
     // Web Scraping
     implementation 'org.jsoup:jsoup:1.17.1'
 
+
+    // Browser Automation (Google Trends dynamic scraping)
+    implementation 'org.seleniumhq.selenium:selenium-java:4.27.0'
+    implementation 'io.github.bonigarcia:webdrivermanager:5.9.2'
+
     // AWS SDK
     implementation platform('software.amazon.awssdk:bom:2.20.0')
     implementation 'software.amazon.awssdk:s3'

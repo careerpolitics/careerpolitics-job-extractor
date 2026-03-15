@@ -47,6 +47,9 @@ careerpolitics:
     google-trends-api-url: https://trends.google.com/trends/api
     google-search-url: https://www.google.com/search
     youtube-rss-url: https://www.youtube.com/feeds/videos.xml
+    selenium:
+      enabled: ${SELENIUM_ENABLED:true}
+      timeout-seconds: ${SELENIUM_TIMEOUT_SECONDS:20}
     ai:
       openrouter:
         base-url: https://openrouter.ai/api/v1

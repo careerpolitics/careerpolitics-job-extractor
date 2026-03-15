@@ -38,6 +38,7 @@ public class TrendArticleService {
     );
 
     private final ObjectMapper objectMapper;
+    private final SeleniumTrendScraper seleniumTrendScraper;
 
     @Value("${careerpolitics.content.google-trends-url:https://trends.google.com/trending}")
     private String googleTrendsUrl;
@@ -135,6 +136,11 @@ public class TrendArticleService {
     }
 
     List<String> fetchGoogleTrends(String geo, String language, int maxTrends) {
+        List<String> seleniumTrends = seleniumTrendScraper.scrapeTrends(googleTrendsUrl, geo, language, maxTrends, this);
+        if (!seleniumTrends.isEmpty()) {
+            return seleniumTrends;
+        }
+
         String url = googleTrendsUrl + "?geo=" + urlEncode(geo) + "&hl=" + urlEncode(language) + "&category=9&status=active";
         for (int attempt = 1; attempt <= 3; attempt++) {
             try {
@@ -777,6 +783,10 @@ public class TrendArticleService {
 
     private String urlDecode(String value) {
         return URLDecoder.decode(value, StandardCharsets.UTF_8);
+    }
+
+    String urlEncodePublic(String value) {
+        return urlEncode(value);
     }
 
     private String urlEncode(String value) {
