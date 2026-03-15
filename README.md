@@ -113,3 +113,4 @@ Example request:
 ### Notes
 - Google Trends/Google Search can block automated scraping; if trend scraping fails, provide `fallbackTrends`.
 - If `publish` is false, the API only returns generated content without posting.
+- Google News RSS links are resolved to original publisher URLs before snippet/media extraction.

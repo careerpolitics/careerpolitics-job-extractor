@@ -17,6 +17,8 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.net.URI;
+import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -66,6 +68,7 @@ public class TrendArticleService {
 
     public TrendArticleResponse createAndOptionallyPublish(TrendArticleRequest request) {
         List<String> trends = fetchGoogleTrends(request.getGeo(), request.getLanguage(), request.getMaxTrends());
+        log.info("Discovered {} trend topics for geo={} language={}", trends.size(), request.getGeo(), request.getLanguage());
         if (trends.isEmpty() && request.getFallbackTrends() != null) {
             trends = request.getFallbackTrends().stream().filter(Objects::nonNull).map(String::trim)
                     .filter(s -> !s.isBlank()).limit(request.getMaxTrends()).toList();
@@ -78,7 +81,9 @@ public class TrendArticleService {
         List<TrendNewsItem> allNews = new ArrayList<>();
 
         for (String trend : trends) {
+            log.info("Processing trend: {}", trend);
             List<TrendNewsItem> newsItems = gatherDetailsForTrend(trend, request.getMaxNewsPerTrend(), request.getGeo(), request.getLanguage());
+            log.info("Collected {} news items for trend: {}", newsItems.size(), trend);
             allNews.addAll(newsItems);
 
             List<TrendMediaItem> mediaItems = new ArrayList<>();
@@ -135,14 +140,22 @@ public class TrendArticleService {
             try {
                 Document doc = Jsoup.connect(url).userAgent("Mozilla/5.0").timeout(15000).get();
                 List<String> trends = extractTrendsFromDocument(doc, maxTrends);
-                if (!trends.isEmpty()) return trends;
+                if (!trends.isEmpty()) {
+                    log.info("Fetched {} trends from Google Trends page", trends.size());
+                    return trends;
+                }
                 if (attempt < 3) Thread.sleep(1200);
             } catch (Exception ex) {
                 log.warn("Failed to scrape Google Trends page (attempt {}): {}", attempt, ex.getMessage());
             }
         }
         List<String> apiTrends = fetchTrendsFromApiEndpoints(geo, language, maxTrends);
-        return apiTrends.isEmpty() ? List.of() : apiTrends;
+        if (!apiTrends.isEmpty()) {
+            log.info("Fetched {} trends from Google Trends API fallback", apiTrends.size());
+            return apiTrends;
+        }
+        log.warn("No trends fetched from page or API fallback");
+        return List.of();
     }
 
     List<String> extractTrendsFromDocument(Document doc, int maxTrends) {
@@ -216,6 +229,7 @@ public class TrendArticleService {
                 + "&hl=" + urlEncode(language) + "&gl=" + urlEncode(geo) + "&ceid=" + urlEncode(geo + ":en");
 
         try {
+            log.debug("Fetching RSS for trend {}: {}", trend, rssUrl);
             Document rssDoc = Jsoup.connect(rssUrl).ignoreContentType(true).userAgent("Mozilla/5.0").timeout(15000).get();
             List<TrendNewsItem> items = parseNewsRssDocument(rssDoc, trend, Math.max(6, maxArticlesPerTrend));
 
@@ -325,12 +339,13 @@ public class TrendArticleService {
         String rssUrl = googleNewsRssUrl + "?q=" + urlEncode(trend + " (twitter OR x.com)")
                 + "&hl=" + urlEncode(language) + "&gl=" + urlEncode(geo) + "&ceid=" + urlEncode(geo + ":en");
         try {
+            log.debug("Fetching RSS for trend {}: {}", trend, rssUrl);
             Document rssDoc = Jsoup.connect(rssUrl).ignoreContentType(true).userAgent("Mozilla/5.0").timeout(15000).get();
             Elements items = rssDoc.select("item");
             List<TrendMediaItem> media = new ArrayList<>();
             for (Element item : items) {
                 if (media.size() >= 2) break;
-                String link = clean(textOf(item, "link"));
+                String link = resolveOriginalNewsUrl(clean(textOf(item, "link")));
                 if (link.contains("twitter.com") || link.contains("x.com")) {
                     media.add(TrendMediaItem.builder()
                             .trend(trend)
@@ -354,7 +369,7 @@ public class TrendArticleService {
         for (Element item : rssItems) {
             if (parsedItems.size() >= maxArticlesPerTrend) break;
             String title = clean(textOf(item, "title"));
-            String link = clean(textOf(item, "link"));
+            String link = resolveOriginalNewsUrl(clean(textOf(item, "link")));
             String source = clean(textOf(item, "source"));
             String publishedAt = clean(textOf(item, "pubDate"));
             String description = clean(Jsoup.parse(textOf(item, "description")).text());
@@ -580,6 +595,58 @@ public class TrendArticleService {
         }
     }
 
+    String resolveOriginalNewsUrl(String link) {
+        if (link == null || link.isBlank()) {
+            return "";
+        }
+        try {
+            URI uri = URI.create(link);
+            String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
+
+            // Google News often wraps publisher URL in query param.
+            String query = uri.getRawQuery();
+            if (query != null && !query.isBlank()) {
+                Map<String, String> params = parseQueryParams(query);
+                String candidate = firstNonBlank(params.get("url"), params.get("q"), params.get("u"));
+                if (!candidate.isBlank() && candidate.startsWith("http")) {
+                    return candidate;
+                }
+            }
+
+            // Follow redirects for news.google.com wrapper links.
+            if (host.contains("news.google.")) {
+                String finalUrl = Jsoup.connect(link)
+                        .followRedirects(true)
+                        .ignoreContentType(true)
+                        .userAgent("Mozilla/5.0")
+                        .timeout(15000)
+                        .execute()
+                        .url()
+                        .toExternalForm();
+                if (finalUrl != null && !finalUrl.isBlank()) {
+                    return finalUrl;
+                }
+            }
+        } catch (Exception ex) {
+            log.debug("Could not resolve original news URL for {}: {}", link, ex.getMessage());
+        }
+        return link;
+    }
+
+    Map<String, String> parseQueryParams(String rawQuery) {
+        Map<String, String> params = new LinkedHashMap<>();
+        if (rawQuery == null || rawQuery.isBlank()) {
+            return params;
+        }
+        for (String pair : rawQuery.split("&")) {
+            String[] kv = pair.split("=", 2);
+            String key = urlDecode(kv[0]);
+            String value = kv.length > 1 ? urlDecode(kv[1]) : "";
+            params.put(key, value);
+        }
+        return params;
+    }
+
     private String textOf(Element parent, String selector) {
         Element found = parent.selectFirst(selector);
         return found != null ? found.text() : "";
@@ -654,6 +721,10 @@ public class TrendArticleService {
             return trimmed.substring(start, end + 1);
         }
         return trimmed;
+    }
+
+    private String urlDecode(String value) {
+        return URLDecoder.decode(value, StandardCharsets.UTF_8);
     }
 
     private String urlEncode(String value) {

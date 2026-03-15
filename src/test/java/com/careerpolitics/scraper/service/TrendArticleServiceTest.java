@@ -100,4 +100,23 @@ class TrendArticleServiceTest {
         assertEquals("upsc2026", service.normalizeTag("UPSC 2026"));
     }
 
+    @Test
+    void resolveOriginalNewsUrl_shouldPreferWrappedQueryUrl() {
+        TrendArticleService service = new TrendArticleService(new ObjectMapper());
+
+        String wrapped = "https://news.google.com/rss/articles/CBMiX2h0dHBzOi8vbmV3cy5zaXRlL2FydGljbGXSAQA?oc=5&url=https%3A%2F%2Fpublisher.com%2Fstory%3Fid%3D1";
+        String resolved = service.resolveOriginalNewsUrl(wrapped);
+
+        assertEquals("https://publisher.com/story?id=1", resolved);
+    }
+
+    @Test
+    void parseQueryParams_shouldDecodeValues() {
+        TrendArticleService service = new TrendArticleService(new ObjectMapper());
+
+        var params = service.parseQueryParams("url=https%3A%2F%2Fexample.com%2Fa%3Fx%3D1&hl=en-US");
+        assertEquals("https://example.com/a?x=1", params.get("url"));
+        assertEquals("en-US", params.get("hl"));
+    }
+
 }

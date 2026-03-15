@@ -9,12 +9,14 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/careerpolitics/content")
 @RequiredArgsConstructor
@@ -32,6 +34,13 @@ public class TrendArticleController {
             @ApiResponse(responseCode = "500", description = "Generation or publishing failed")
     })
     public ResponseEntity<TrendArticleResponse> createTrendingArticle(@Valid @RequestBody TrendArticleRequest request) {
-        return ResponseEntity.ok(trendArticleService.createAndOptionallyPublish(request));
+        log.info("Trend article request received: geo={}, language={}, maxTrends={}, maxNewsPerTrend={}, publish={}",
+                request.getGeo(), request.getLanguage(), request.getMaxTrends(), request.getMaxNewsPerTrend(), request.isPublish());
+
+        TrendArticleResponse response = trendArticleService.createAndOptionallyPublish(request);
+        log.info("Trend article request completed: trends={}, generatedArticles={}",
+                response.getTrends() != null ? response.getTrends().size() : 0,
+                response.getArticles() != null ? response.getArticles().size() : 0);
+        return ResponseEntity.ok(response);
     }
 }
