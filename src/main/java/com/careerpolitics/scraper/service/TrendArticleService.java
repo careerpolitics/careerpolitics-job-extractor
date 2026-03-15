@@ -81,8 +81,13 @@ public class TrendArticleService {
             List<TrendNewsItem> newsItems = gatherDetailsForTrend(trend, request.getMaxNewsPerTrend(), request.getGeo(), request.getLanguage());
             allNews.addAll(newsItems);
 
-            List<TrendMediaItem> mediaItems = gatherMediaForTrend(trend, request.getGeo(), request.getLanguage());
-            Map<String, Object> articleData = generateArticleWithGoogleAi(trend, newsItems, mediaItems);
+            List<TrendMediaItem> mediaItems = new ArrayList<>();
+            mediaItems.addAll(extractMediaFromNewsLinks(trend, newsItems));
+            mediaItems.addAll(gatherMediaForTrend(trend, request.getGeo(), request.getLanguage()));
+            mediaItems = mediaItems.stream().distinct().limit(8).toList();
+            String coverImage = pickCoverImage(mediaItems);
+
+            Map<String, Object> articleData = generateArticleWithGoogleAi(trend, newsItems, mediaItems, coverImage);
 
             @SuppressWarnings("unchecked")
             List<String> tags = (List<String>) articleData.getOrDefault("tags", defaultTagsForTrend(trend));
@@ -94,7 +99,7 @@ public class TrendArticleService {
             Map<String, Object> publishResponse = null;
             boolean published = false;
             if (request.isPublish()) {
-                publishResponse = publishToCareerPolitics(title, markdown, tags, trend, newsItems);
+                publishResponse = publishToCareerPolitics(title, markdown, tags, trend, newsItems, coverImage);
                 published = Boolean.TRUE.equals(publishResponse.get("success"));
             }
 
@@ -106,6 +111,7 @@ public class TrendArticleService {
                     .keywords(keywords)
                     .sources(newsItems)
                     .media(mediaItems)
+                    .coverImage(coverImage)
                     .published(published)
                     .publishResponse(publishResponse)
                     .build());
@@ -236,6 +242,56 @@ public class TrendArticleService {
         }
     }
 
+    List<TrendMediaItem> extractMediaFromNewsLinks(String trend, List<TrendNewsItem> newsItems) {
+        List<TrendMediaItem> media = new ArrayList<>();
+        for (TrendNewsItem item : newsItems) {
+            if (media.size() >= 6) {
+                break;
+            }
+            media.addAll(extractMediaFromArticleLink(trend, item.getLink(), item.getTitle()));
+        }
+        return media;
+    }
+
+    List<TrendMediaItem> extractMediaFromArticleLink(String trend, String link, String fallbackTitle) {
+        try {
+            Document doc = Jsoup.connect(link).userAgent("Mozilla/5.0").timeout(12000).get();
+            List<TrendMediaItem> media = new ArrayList<>();
+
+            String image = firstNonBlank(
+                    doc.select("meta[property=og:image]").attr("content"),
+                    doc.select("meta[name=twitter:image]").attr("content"),
+                    doc.select("article img[src]").attr("abs:src"),
+                    doc.select("img[src]").attr("abs:src")
+            );
+            if (!image.isBlank()) {
+                media.add(TrendMediaItem.builder().trend(trend).type("image").title(fallbackTitle).url(image).embed(image).build());
+            }
+
+            String video = firstNonBlank(
+                    doc.select("meta[property=og:video]").attr("content"),
+                    doc.select("video source[src]").attr("abs:src"),
+                    doc.select("iframe[src*='youtube.com'], iframe[src*='youtu.be']").attr("abs:src")
+            );
+            if (!video.isBlank()) {
+                media.add(TrendMediaItem.builder().trend(trend).type("video").title(fallbackTitle).url(video).embed(video).build());
+            }
+
+            return media;
+        } catch (Exception ex) {
+            return List.of();
+        }
+    }
+
+    String pickCoverImage(List<TrendMediaItem> mediaItems) {
+        for (TrendMediaItem item : mediaItems) {
+            if ("image".equalsIgnoreCase(item.getType()) && item.getUrl() != null && !item.getUrl().isBlank()) {
+                return item.getUrl();
+            }
+        }
+        return "";
+    }
+
     List<TrendMediaItem> gatherMediaForTrend(String trend, String geo, String language) {
         List<TrendMediaItem> media = new ArrayList<>();
         media.addAll(fetchYoutubeMedia(trend));
@@ -318,7 +374,7 @@ public class TrendArticleService {
         return parsedItems;
     }
 
-    Map<String, Object> generateArticleWithGoogleAi(String trend, List<TrendNewsItem> newsItems, List<TrendMediaItem> mediaItems) {
+    Map<String, Object> generateArticleWithGoogleAi(String trend, List<TrendNewsItem> newsItems, List<TrendMediaItem> mediaItems, String coverImage) {
         if (googleAiApiKey == null || googleAiApiKey.isBlank()) {
             throw new IllegalStateException("Google AI API key is missing. Set careerpolitics.content.ai.google.api-key");
         }
@@ -328,12 +384,15 @@ public class TrendArticleService {
         String mediaText = mediaItems.stream().map(m -> "- " + m.getType() + " | " + m.getTitle() + " | " + m.getUrl())
                 .collect(Collectors.joining("\n"));
 
-        String prompt = "Create ONE detailed SEO-friendly article in markdown for trend: " + trend + ". " +
-                "Use clear human-readable language with headings, subheadings, bullets, and short paragraphs. " +
-                "Must include: what happened, why trending, timeline, important statements/reactions, and impact. " +
-                "Must include an intro and conclusion. Must include at least 3 source references in a '## Sources' section. " +
-                "Include media embeds where relevant using markdown links for images/videos/social posts under '## Media'. " +
+        String prompt = "Create ONE detailed, engaging, SEO-friendly markdown article for trend: " + trend + ". " +
+                "Decide the best article structure dynamically based on the provided facts. " +
+                "Write in clear human language with compelling intro and strong narrative flow. " +
+                "Must include: what happened, why trending, timeline, key statements/reactions, context, and practical impact. " +
+                "Use headings/subheadings, bullet points, and short readable paragraphs. " +
+                "Must include '## Sources' with at least 3 references, and '## Media' with relevant embeds/links. " +
+                "If cover image is provided, reference it in markdown at top using a standard image markdown line. " +
                 "Return strict JSON with keys: title, markdown, tags(array), keywords(array).\n\n" +
+                "Cover image: " + (coverImage == null ? "" : coverImage) + "\n\n" +
                 "News sources:\n" + sourcesText + "\n\nMedia candidates:\n" + mediaText;
 
         Map<String, Object> body = Map.of(
@@ -365,7 +424,7 @@ public class TrendArticleService {
         }
     }
 
-    Map<String, Object> publishToCareerPolitics(String title, String markdown, List<String> tags, String trend, List<TrendNewsItem> newsItems) {
+    Map<String, Object> publishToCareerPolitics(String title, String markdown, List<String> tags, String trend, List<TrendNewsItem> newsItems, String coverImage) {
         if (articleApiUrl == null || articleApiUrl.isBlank()) {
             return Map.of(
                     "success", false,
@@ -379,13 +438,16 @@ public class TrendArticleService {
         String description = buildDescription(trend, newsItems);
 
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("article", Map.of(
-                "title", title,
-                "description", description,
-                "body_markdown", safeMarkdown,
-                "published", true,
-                "tags", safeTags
-        ));
+        Map<String, Object> articlePayload = new LinkedHashMap<>();
+        articlePayload.put("title", title);
+        articlePayload.put("description", description);
+        articlePayload.put("body_markdown", safeMarkdown);
+        articlePayload.put("published", true);
+        articlePayload.put("tags", safeTags);
+        if (coverImage != null && !coverImage.isBlank()) {
+            articlePayload.put("main_image", coverImage);
+        }
+        payload.put("article", articlePayload);
         payload.put("meta", Map.of(
                 "source", "google-trends-plus-news-rss",
                 "trend", trend,

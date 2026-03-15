@@ -16,6 +16,7 @@ public class TrendGeneratedArticle {
     private List<String> keywords;
     private List<TrendNewsItem> sources;
     private List<TrendMediaItem> media;
+    private String coverImage;
     private boolean published;
     private Map<String, Object> publishResponse;
 }
