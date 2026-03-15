@@ -110,6 +110,7 @@ Example request:
 - `CAREERPOLITICS_ARTICLE_API_TOKEN` optional auth token sent as `api-key`
 - Optional: `SELENIUM_ENABLED` (default `true`) to enable Selenium scraping
 - Optional: `SELENIUM_NEWS_ENABLED` (default `true`) to enable Selenium-based Google Search news scraping
+- Optional: `SELENIUM_HEADLESS` (default `false`) to open browser window for debugging when Selenium runs
 - Optional: `SELENIUM_TIMEOUT_SECONDS` (default `20`) for Selenium wait timeout
 - Optional: `careerpolitics.content.youtube-rss-url` for YouTube media discovery
 

@@ -49,6 +49,7 @@ careerpolitics:
     selenium:
       enabled: ${SELENIUM_ENABLED:true}
       news-enabled: ${SELENIUM_NEWS_ENABLED:true}
+      headless: ${SELENIUM_HEADLESS:false}
       timeout-seconds: ${SELENIUM_TIMEOUT_SECONDS:20}
     ai:
       openrouter:

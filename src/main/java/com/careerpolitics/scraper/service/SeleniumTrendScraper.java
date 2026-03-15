@@ -8,6 +8,9 @@ import org.openqa.selenium.*;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.support.ui.WebDriverWait;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -27,6 +30,9 @@ public class SeleniumTrendScraper {
     @Value("${careerpolitics.content.selenium.news-enabled:true}")
     private boolean seleniumNewsEnabled;
 
+    @Value("${careerpolitics.content.selenium.headless:false}")
+    private boolean seleniumHeadless;
+
     public List<String> scrapeTrends(String trendsUrl, String geo, String language, int maxTrends, TrendArticleService extractor) {
         if (!seleniumEnabled) {
             return List.of();
@@ -39,10 +45,7 @@ public class SeleniumTrendScraper {
         try {
             WebDriverManager.chromedriver().setup();
 
-            ChromeOptions options = new ChromeOptions();
-            options.addArguments("--headless=new", "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu");
-            options.addArguments("--window-size=1920,1080");
-            driver = new ChromeDriver(options);
+            driver = new ChromeDriver(buildChromeOptions());
 
             for (int attempt = 1; attempt <= 3; attempt++) {
                 driver.get(url);
@@ -94,10 +97,7 @@ public class SeleniumTrendScraper {
         try {
             WebDriverManager.chromedriver().setup();
 
-            ChromeOptions options = new ChromeOptions();
-            options.addArguments("--headless=new", "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu");
-            options.addArguments("--window-size=1920,1080");
-            driver = new ChromeDriver(options);
+            driver = new ChromeDriver(buildChromeOptions());
 
             for (int attempt = 1; attempt <= 3; attempt++) {
                 driver.get(searchUrl);
@@ -105,16 +105,19 @@ public class SeleniumTrendScraper {
                 new WebDriverWait(driver, Duration.ofSeconds(Math.max(8, timeoutSeconds)))
                         .until(d -> d.getPageSource() != null && d.getPageSource().contains("<body"));
 
+                dismissConsentIfPresent(driver);
+                ensureNewsTab(driver, searchUrl);
+
                 new WebDriverWait(driver, Duration.ofSeconds(Math.max(8, timeoutSeconds)))
-                        .until(d -> !d.findElements(By.cssSelector("div.SoaBEf, div.dbsr, g-card, article")).isEmpty());
+                        .until(d -> !d.findElements(By.cssSelector("div.SoaBEf, div.dbsr, div.MjjYud, g-card, article, a.WlydOe")).isEmpty());
 
                 if (driver instanceof JavascriptExecutor js) {
                     js.executeScript("window.scrollTo(0, document.body.scrollHeight * 0.75);");
-                    Thread.sleep(1000);
+                    Thread.sleep(1200);
                 }
 
                 String html = driver.getPageSource();
-                List<TrendNewsItem> newsItems = extractor.parseGoogleSearchNewsDocument(Jsoup.parse(html), trend, maxArticlesPerTrend);
+                List<TrendNewsItem> newsItems = extractor.parseGoogleSearchNewsDocument(Jsoup.parse(html, searchUrl), trend, maxArticlesPerTrend);
                 if (!newsItems.isEmpty()) {
                     log.info("Selenium Google Search news scrape returned {} items for trend={} on attempt {}", newsItems.size(), trend, attempt);
                     return newsItems;
@@ -137,4 +140,61 @@ public class SeleniumTrendScraper {
             }
         }
     }
+
+    private ChromeOptions buildChromeOptions() {
+        ChromeOptions options = new ChromeOptions();
+        if (seleniumHeadless) {
+            options.addArguments("--headless=new");
+        }
+        options.addArguments("--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu");
+        options.addArguments("--window-size=1920,1080");
+        return options;
+    }
+
+    private void dismissConsentIfPresent(WebDriver driver) {
+        try {
+            List<By> consentButtons = List.of(
+                    By.cssSelector("button[aria-label*='Accept']"),
+                    By.cssSelector("button[aria-label*='I agree']"),
+                    By.cssSelector("button#L2AGLb"),
+                    By.xpath("//button[contains(., 'Accept all') or contains(., 'I agree')]")
+            );
+            for (By by : consentButtons) {
+                List<WebElement> buttons = driver.findElements(by);
+                if (!buttons.isEmpty()) {
+                    buttons.get(0).click();
+                    Thread.sleep(700);
+                    return;
+                }
+            }
+        } catch (Exception ex) {
+            log.debug("No consent dialog action needed: {}", ex.getMessage());
+        }
+    }
+
+    private void ensureNewsTab(WebDriver driver, String searchUrl) {
+        try {
+            boolean hasNewsCards = !driver.findElements(By.cssSelector("div.SoaBEf, div.dbsr, div.MjjYud, g-card, article")).isEmpty();
+            if (hasNewsCards) {
+                return;
+            }
+
+            List<WebElement> newsTab = driver.findElements(By.cssSelector("a[href*='tbm=nws']"));
+            if (!newsTab.isEmpty()) {
+                newsTab.get(0).click();
+                Thread.sleep(900);
+                return;
+            }
+
+            if (!searchUrl.contains("tbm=nws")) {
+                String forcedNewsUrl = searchUrl + (searchUrl.contains("?") ? "&" : "?")
+                        + "tbm=nws&udm=14&num=" + URLEncoder.encode("20", StandardCharsets.UTF_8);
+                driver.get(forcedNewsUrl);
+                Thread.sleep(900);
+            }
+        } catch (Exception ex) {
+            log.debug("Could not force news tab: {}", ex.getMessage());
+        }
+    }
+
 }
