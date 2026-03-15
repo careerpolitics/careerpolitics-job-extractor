@@ -12,6 +12,7 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -94,7 +95,7 @@ public class TrendArticleService {
             boolean published = false;
             if (request.isPublish()) {
                 publishResponse = publishToCareerPolitics(title, markdown, tags, trend, newsItems);
-                published = true;
+                published = Boolean.TRUE.equals(publishResponse.get("success"));
             }
 
             generatedArticles.add(TrendGeneratedArticle.builder()
@@ -366,15 +367,24 @@ public class TrendArticleService {
 
     Map<String, Object> publishToCareerPolitics(String title, String markdown, List<String> tags, String trend, List<TrendNewsItem> newsItems) {
         if (articleApiUrl == null || articleApiUrl.isBlank()) {
-            throw new IllegalStateException("Article API URL is missing. Set careerpolitics.content.article-api.url");
+            return Map.of(
+                    "success", false,
+                    "status", 500,
+                    "error", "Article API URL is missing. Set careerpolitics.content.article-api.url"
+            );
         }
+
+        List<String> safeTags = sanitizeTags(tags);
+        String safeMarkdown = markdown == null ? "" : markdown;
+        String description = buildDescription(trend, newsItems);
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("article", Map.of(
                 "title", title,
-                "body_markdown", markdown,
+                "description", description,
+                "body_markdown", safeMarkdown,
                 "published", true,
-                "tags", tags
+                "tags", safeTags
         ));
         payload.put("meta", Map.of(
                 "source", "google-trends-plus-news-rss",
@@ -383,13 +393,56 @@ public class TrendArticleService {
         ));
 
         WebClient.Builder builder = WebClient.builder();
-        if (articleApiToken != null && !articleApiToken.isBlank()) builder.defaultHeader("api-key", articleApiToken);
-        String response = builder.build().post().uri(articleApiUrl).contentType(MediaType.APPLICATION_JSON).bodyValue(payload).retrieve().bodyToMono(String.class).block();
+        if (articleApiToken != null && !articleApiToken.isBlank()) {
+            builder.defaultHeader("api-key", articleApiToken);
+        }
 
         try {
-            return objectMapper.readValue(response, Map.class);
+            Map<String, Object> response = builder.build().post()
+                    .uri(articleApiUrl)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(payload)
+                    .exchangeToMono(clientResponse -> clientResponse.bodyToMono(String.class)
+                            .defaultIfEmpty("")
+                            .map(body -> {
+                                int status = clientResponse.statusCode().value();
+                                if (clientResponse.statusCode().is2xxSuccessful()) {
+                                    return parseResponseOrRaw(status, true, body, null);
+                                }
+                                String error = body.isBlank() ? "Publishing failed with status " + status : body;
+                                return parseResponseOrRaw(status, false, body, error);
+                            }))
+                    .block();
+
+            return response != null ? response : Map.of("success", false, "status", 500, "error", "Empty response from article API");
         } catch (Exception ex) {
-            return Map.of("raw", response);
+            log.error("Article publish request failed for trend {}", trend, ex);
+            return Map.of(
+                    "success", false,
+                    "status", HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                    "error", ex.getMessage()
+            );
+        }
+    }
+
+    private Map<String, Object> parseResponseOrRaw(int status, boolean success, String body, String error) {
+        try {
+            Map<String, Object> parsed = objectMapper.readValue(body, Map.class);
+            parsed.put("success", success);
+            parsed.put("status", status);
+            if (!success && error != null) {
+                parsed.putIfAbsent("error", error);
+            }
+            return parsed;
+        } catch (Exception ex) {
+            Map<String, Object> raw = new LinkedHashMap<>();
+            raw.put("success", success);
+            raw.put("status", status);
+            if (error != null) {
+                raw.put("error", error);
+            }
+            raw.put("raw", body);
+            return raw;
         }
     }
 
@@ -399,6 +452,37 @@ public class TrendArticleService {
 
     private List<String> defaultKeywordsForTrend(String trend) {
         return List.of(trend, trend + " jobs", trend + " education", "India trending news");
+    }
+
+    private List<String> sanitizeTags(List<String> tags) {
+        List<String> source = (tags == null || tags.isEmpty()) ? List.of("trending", "jobs", "education", "india") : tags;
+        LinkedHashSet<String> cleaned = new LinkedHashSet<>();
+        for (String tag : source) {
+            String normalized = clean(tag).toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9- ]", "").trim();
+            if (!normalized.isBlank()) {
+                cleaned.add(normalized.length() > 30 ? normalized.substring(0, 30) : normalized);
+            }
+            if (cleaned.size() >= 4) {
+                break;
+            }
+        }
+        if (cleaned.isEmpty()) {
+            cleaned.addAll(List.of("trending", "jobs", "education", "india"));
+        }
+        return new ArrayList<>(cleaned);
+    }
+
+    private String buildDescription(String trend, List<TrendNewsItem> newsItems) {
+        String base = "Latest update on " + trend + " with context on jobs and education impact in India.";
+        if (newsItems == null || newsItems.isEmpty()) {
+            return base;
+        }
+        String first = clean(newsItems.get(0).getSnippet());
+        if (first.isBlank()) {
+            first = clean(newsItems.get(0).getTitle());
+        }
+        String merged = (base + " " + first).trim();
+        return merged.length() > 200 ? merged.substring(0, 200) : merged;
     }
 
     private List<String> toStringList(JsonNode arrayNode, List<String> fallback) {
