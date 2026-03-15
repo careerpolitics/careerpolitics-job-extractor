@@ -49,22 +49,6 @@ class TrendArticleServiceTest {
     }
 
     @Test
-    void parseGoogleTrendsApiPayload_shouldParseXssiJsonPayload() {
-        TrendArticleService service = new TrendArticleService(new ObjectMapper(), new SeleniumTrendScraper());
-        String payload = ")]}'\n" +
-                "{\"default\":{\"trendingStories\":[" +
-                "{\"title\":{\"query\":\"SBI PO Notification\"}}," +
-                "{\"title\":{\"query\":\"Go back\"}}]," +
-                "\"trendingSearchesDays\":[{\"trendingSearches\":[" +
-                "{\"title\":{\"query\":\"NEET UG 2026\"}}]}]}}";
-
-        List<String> trends = service.parseGoogleTrendsApiPayload(payload, 5);
-
-        assertEquals(2, trends.size());
-        assertEquals("SBI PO Notification", trends.get(0));
-        assertEquals("NEET UG 2026", trends.get(1));
-    }
-    @Test
     void parseGoogleSearchNewsDocument_shouldExtractHeadlineDetails() {
         TrendArticleService service = new TrendArticleService(new ObjectMapper(), new SeleniumTrendScraper());
 

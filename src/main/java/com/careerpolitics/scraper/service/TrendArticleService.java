@@ -46,8 +46,6 @@ public class TrendArticleService {
     @Value("${careerpolitics.content.google-search-url:https://www.google.com/search}")
     private String googleSearchUrl;
 
-    @Value("${careerpolitics.content.google-trends-api-url:https://trends.google.com/trends/api}")
-    private String googleTrendsApiUrl;
 
     @Value("${careerpolitics.content.youtube-rss-url:https://www.youtube.com/feeds/videos.xml}")
     private String youtubeRssUrl;
@@ -155,12 +153,7 @@ public class TrendArticleService {
                 log.warn("Failed to scrape Google Trends page (attempt {}): {}", attempt, ex.getMessage());
             }
         }
-        List<String> apiTrends = fetchTrendsFromApiEndpoints(geo, language, maxTrends);
-        if (!apiTrends.isEmpty()) {
-            log.info("Fetched {} trends from Google Trends API fallback", apiTrends.size());
-            return apiTrends;
-        }
-        log.warn("No trends fetched from page or API fallback");
+        log.warn("No trends fetched from Selenium or page scraping");
         return List.of();
     }
 
@@ -177,55 +170,6 @@ public class TrendArticleService {
             String candidate = firstNonBlank(element.attr("data-term"), element.attr("title"), element.attr("aria-label"), element.text());
             addIfValidTrend(candidate, trends, maxTrends);
             if (trends.size() >= maxTrends) break;
-        }
-        return new ArrayList<>(trends);
-    }
-
-    List<String> fetchTrendsFromApiEndpoints(String geo, String language, int maxTrends) {
-        LinkedHashSet<String> trends = new LinkedHashSet<>();
-        List<String> endpoints = List.of(
-                googleTrendsApiUrl + "/realtimetrends?hl=" + urlEncode(language) + "&tz=-330&cat=all&fi=0&fs=0&geo=" + urlEncode(geo) + "&ri=300&rs=20&sort=0",
-                googleTrendsApiUrl + "/dailytrends?hl=" + urlEncode(language) + "&tz=-330&geo=" + urlEncode(geo) + "&ns=15"
-        );
-        for (String endpoint : endpoints) {
-            try {
-                String raw = Jsoup.connect(endpoint).ignoreContentType(true).userAgent("Mozilla/5.0").timeout(15000).execute().body();
-                for (String trend : parseGoogleTrendsApiPayload(raw, maxTrends)) {
-                    addIfValidTrend(trend, trends, maxTrends);
-                    if (trends.size() >= maxTrends) return new ArrayList<>(trends);
-                }
-            } catch (Exception ex) {
-                log.warn("Failed trends API fallback call {}: {}", endpoint, ex.getMessage());
-            }
-        }
-        return new ArrayList<>(trends);
-    }
-
-    List<String> parseGoogleTrendsApiPayload(String raw, int maxTrends) {
-        if (raw == null || raw.isBlank()) return List.of();
-        String sanitized = raw.startsWith(")]}'") ? raw.substring(4) : raw;
-        LinkedHashSet<String> trends = new LinkedHashSet<>();
-        try {
-            JsonNode root = objectMapper.readTree(sanitized).path("default");
-            JsonNode realtimeStories = root.path("trendingStories");
-            if (realtimeStories.isArray()) {
-                for (JsonNode story : realtimeStories) {
-                    addIfValidTrend(clean(story.path("title").path("query").asText()), trends, maxTrends);
-                }
-            }
-            JsonNode dailyDays = root.path("trendingSearchesDays");
-            if (dailyDays.isArray()) {
-                for (JsonNode day : dailyDays) {
-                    JsonNode searches = day.path("trendingSearches");
-                    if (searches.isArray()) {
-                        for (JsonNode search : searches) {
-                            addIfValidTrend(clean(search.path("title").path("query").asText()), trends, maxTrends);
-                        }
-                    }
-                }
-            }
-        } catch (Exception ex) {
-            log.warn("Failed parsing Google Trends API payload: {}", ex.getMessage());
         }
         return new ArrayList<>(trends);
     }
