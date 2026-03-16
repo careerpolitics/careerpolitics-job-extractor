@@ -267,7 +267,7 @@ public class SeleniumTrendScraper {
             for (By by : consentButtons) {
                 List<WebElement> buttons = driver.findElements(by);
                 if (!buttons.isEmpty()) {
-                    buttons.getFirst().click();
+                    buttons.get(0).click();
                     randomSleep(500, 1200);
                     return;
                 }
@@ -286,7 +286,7 @@ public class SeleniumTrendScraper {
 
             List<WebElement> newsTab = driver.findElements(By.cssSelector("a[href*='tbm=nws']"));
             if (!newsTab.isEmpty()) {
-                newsTab.getFirst().click();
+                newsTab.get(0).click();
                 randomSleep(700, 1500);
                 return;
             }

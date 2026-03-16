@@ -50,4 +50,5 @@ The spec includes a commented block to add a managed Postgres database and wire 
 ## 7) Troubleshooting
 - If startup fails on port binding, confirm `server.port=${PORT:8080}` is present.
 - If Selenium fails in cloud runtime, keep `SELENIUM_HEADLESS=true` and reduce retries (`SELENIUM_MAX_ATTEMPTS=2/3`).
-- If traffic/bot checks are high, prefer fallback trends and tune Selenium toggles via envs.
+- If traffic/bot checks are high, keep headless mode enabled, use proxy pool, and tune Selenium retry/timeout envs.
+- Enable hourly publishing with `TRENDS_SCHEDULER_ENABLED=true` and keep trend repetition low with `TRENDS_SCHEDULER_TREND_COOLDOWN_HOURS=24` (or higher).

@@ -7,6 +7,7 @@ import com.careerpolitics.scraper.model.response.TrendMediaResponse;
 import com.careerpolitics.scraper.model.response.TrendNewsItem;
 import com.careerpolitics.scraper.model.response.TrendNewsResponse;
 import com.careerpolitics.scraper.service.TrendArticleService;
+import com.careerpolitics.scraper.service.TrendArticleWorkflowService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -30,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class TrendArticleController {
 
     private final TrendArticleService trendArticleService;
+    private final TrendArticleWorkflowService trendArticleWorkflowService;
 
 
     @GetMapping("/trends/discover")
@@ -102,7 +104,7 @@ public class TrendArticleController {
         log.info("Trend article request received: geo={}, language={}, maxTrends={}, maxNewsPerTrend={}, publish={}",
                 request.getGeo(), request.getLanguage(), request.getMaxTrends(), request.getMaxNewsPerTrend(), request.shouldPublish());
 
-        TrendArticleResponse response = trendArticleService.createAndOptionallyPublish(request);
+        TrendArticleResponse response = trendArticleWorkflowService.createAndOptionallyPublish(request);
         log.info("Trend article request completed: trends={}, generatedArticles={}",
                 response.getTrends() != null ? response.getTrends().size() : 0,
                 response.getArticles() != null ? response.getArticles().size() : 0);
