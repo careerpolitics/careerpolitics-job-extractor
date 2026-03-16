@@ -42,6 +42,25 @@ careerpolitics:
     s3-bucket: careerpolitics-job-images
     image-quality: 85
     max-image-size-kb: 500
+  content:
+    google-trends-url: https://trends.google.com/trending
+    google-search-url: https://www.google.com/search
+    youtube-rss-url: https://www.youtube.com/feeds/videos.xml
+    selenium:
+      enabled: ${SELENIUM_ENABLED:true}
+      news-enabled: ${SELENIUM_NEWS_ENABLED:true}
+      headless: ${SELENIUM_HEADLESS:false}
+      manual-verification-wait-enabled: ${SELENIUM_MANUAL_VERIFICATION_WAIT_ENABLED:true}
+      manual-verification-max-wait-seconds: ${SELENIUM_MANUAL_VERIFICATION_MAX_WAIT_SECONDS:180}
+      timeout-seconds: ${SELENIUM_TIMEOUT_SECONDS:20}
+    ai:
+      openrouter:
+        base-url: https://openrouter.ai/api/v1
+        model: anthropic/claude-3.5-sonnet
+        api-key: ${OPENROUTER_API_KEY:}
+    article-api:
+      url: ${CAREERPOLITICS_ARTICLE_API_URL:}
+      token: ${CAREERPOLITICS_ARTICLE_API_TOKEN:}
 
 # API Documentation
 api:
@@ -80,5 +99,3 @@ logging:
 
 server:
   port: 8080
-  servlet:
-    context-path: /careerpolitics
