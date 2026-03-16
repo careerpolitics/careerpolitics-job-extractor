@@ -99,6 +99,10 @@ public class SeleniumTrendScraper {
                 new WebDriverWait(driver, Duration.ofSeconds(Math.max(8, timeoutSeconds)))
                         .until(d -> !d.findElements(By.cssSelector("table tr, [data-row-id], [data-term], .mZ3RIc, .QNIh4d")).isEmpty());
 
+                JavascriptExecutor js = (JavascriptExecutor) driver;
+                js.executeScript("window.scrollTo(0, document.body.scrollHeight * 0.5);");
+                Thread.sleep(1000);
+
                 String html = driver.getPageSource();
                 Document doc = Jsoup.parse(html);
                 List<String> trends = extractor.extractTrendsFromDocument(doc, maxTrends);
@@ -172,6 +176,10 @@ public class SeleniumTrendScraper {
 
                 new WebDriverWait(driver, Duration.ofSeconds(Math.max(8, timeoutSeconds)))
                         .until(d -> !d.findElements(By.cssSelector("div.SoaBEf, div.dbsr, div.MjjYud, g-card, article, a.WlydOe")).isEmpty());
+
+                JavascriptExecutor js = (JavascriptExecutor) driver;
+                js.executeScript("window.scrollTo(0, document.body.scrollHeight * 0.75);");
+                Thread.sleep(1200);
 
                 String html = driver.getPageSource();
                 List<TrendNewsItem> newsItems = extractor.parseGoogleSearchNewsDocument(Jsoup.parse(html, searchUrl), trend, maxArticlesPerTrend);
@@ -259,7 +267,7 @@ public class SeleniumTrendScraper {
             for (By by : consentButtons) {
                 List<WebElement> buttons = driver.findElements(by);
                 if (!buttons.isEmpty()) {
-                    buttons.get(0).click();
+                    buttons.getFirst().click();
                     randomSleep(500, 1200);
                     return;
                 }
@@ -278,7 +286,7 @@ public class SeleniumTrendScraper {
 
             List<WebElement> newsTab = driver.findElements(By.cssSelector("a[href*='tbm=nws']"));
             if (!newsTab.isEmpty()) {
-                newsTab.get(0).click();
+                newsTab.getFirst().click();
                 randomSleep(700, 1500);
                 return;
             }

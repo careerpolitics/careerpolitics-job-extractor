@@ -183,7 +183,7 @@ public class TrendArticleService {
             );
         }
 
-        TrendGeneratedArticle first = generatedArticles.isEmpty() ? null : generatedArticles.get(0);
+        TrendGeneratedArticle first = generatedArticles.getFirst();
         return TrendArticleResponse.builder()
                 .trends(trends)
                 .news(allNews)
@@ -678,9 +678,9 @@ public class TrendArticleService {
         if (newsItems == null || newsItems.isEmpty()) {
             return base;
         }
-        String first = clean(newsItems.get(0).getSnippet());
+        String first = clean(newsItems.getFirst().getSnippet());
         if (first.isBlank()) {
-            first = clean(newsItems.get(0).getTitle());
+            first = clean(newsItems.getFirst().getTitle());
         }
         String merged = (base + " " + first).trim();
         return merged.length() > 200 ? merged.substring(0, 200) : merged;
@@ -704,7 +704,7 @@ public class TrendArticleService {
                     .timeout(15000)
                     .get();
 
-            String html = articleDoc.body() != null ? articleDoc.body().html() : "";
+            String html = articleDoc.body().html();
             String articleText = ArticleExtractor.INSTANCE.getText(html);
 
             if (articleText == null || articleText.isBlank()) {
@@ -813,7 +813,7 @@ public class TrendArticleService {
     private void addIfValidTrend(String candidate, LinkedHashSet<String> trends, int maxTrends) {
         String cleaned = normalizeTrendCandidate(candidate);
         if (isLikelyTrendTerm(cleaned)) trends.add(cleaned);
-        while (trends.size() > maxTrends) trends.remove(trends.iterator().next());
+        while (trends.size() > maxTrends) trends.remove(trends.getFirst());
     }
 
     private String normalizeTrendCandidate(String candidate) {
@@ -923,7 +923,6 @@ public class TrendArticleService {
             if (c == '"' && !escaped) {
                 inString = !inString;
                 out.append(c);
-                escaped = false;
                 continue;
             }
 
