@@ -11,6 +11,7 @@ import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
+import org.openqa.selenium.SessionNotCreatedException;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.interactions.Actions;
@@ -19,6 +20,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.net.URLEncoder;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -62,6 +65,13 @@ public class SeleniumTrendScraper {
 
     private final Random random = new Random();
 
+    @Value("${careerpolitics.content.selenium.persistent-profile-enabled:false}")
+    private boolean persistentProfileEnabled;
+
+    @Value("${careerpolitics.content.selenium.user-data-dir:profile}")
+    private String seleniumUserDataDir;
+
+
     public List<String> scrapeTrends(String trendsUrl, String geo, String language, int maxTrends, TrendArticleService extractor) {
         if (!seleniumEnabled) {
             return List.of();
@@ -72,10 +82,13 @@ public class SeleniumTrendScraper {
 
         WebDriverManager.chromedriver().setup();
 
-        for (int attempt = 1; attempt <= Math.max(1, maxAttempts); attempt++) {
+        int effectiveAttempts = seleniumHeadless ? Math.max(1, maxAttempts) : 1;
+        for (int attempt = 1; attempt <= effectiveAttempts; attempt++) {
             WebDriver driver = null;
+            DriverSession driverSession = null;
             try {
-                driver = createStealthChromeDriver(null);
+                driverSession = createStealthChromeDriver(null, attempt);
+                driver = driverSession.driver();
                 driver.get(url);
 
                 new WebDriverWait(driver, Duration.ofSeconds(Math.max(8, timeoutSeconds)))
@@ -95,10 +108,14 @@ public class SeleniumTrendScraper {
                 }
 
                 log.warn("Selenium trends scrape attempt {} returned 0 trends", attempt);
+            } catch (SessionNotCreatedException ex) {
+                log.warn("Selenium trends session could not be created on attempt {}: {}", attempt, ex.getMessage());
+                break;
             } catch (Exception ex) {
                 log.warn("Selenium trends scrape attempt {} failed: {}", attempt, ex.getMessage());
             } finally {
                 quitDriver(driver);
+                cleanupProfileDir(driverSession);
             }
 
             randomSleep(800, 2200);
@@ -115,11 +132,14 @@ public class SeleniumTrendScraper {
         WebDriverManager.chromedriver().setup();
         ProxyManager proxyManager = new ProxyManager(parseProxyPool(proxyPool));
 
-        for (int attempt = 1; attempt <= Math.max(1, maxAttempts); attempt++) {
+        int effectiveAttempts = seleniumHeadless ? Math.max(1, maxAttempts) : 1;
+        for (int attempt = 1; attempt <= effectiveAttempts; attempt++) {
             String proxy = proxyManager.acquireProxy();
             WebDriver driver = null;
+            DriverSession driverSession = null;
             try {
-                driver = createStealthChromeDriver(proxy);
+                driverSession = createStealthChromeDriver(proxy, attempt);
+                driver = driverSession.driver();
                 driver.get(searchUrl);
 
                 new WebDriverWait(driver, Duration.ofSeconds(Math.max(8, timeoutSeconds)))
@@ -161,11 +181,16 @@ public class SeleniumTrendScraper {
                 }
 
                 log.warn("Selenium Google Search news scrape attempt {} returned 0 items for trend={}", attempt, trend);
+            } catch (SessionNotCreatedException ex) {
+                log.warn("Selenium session could not be created for trend={} attempt={} proxy={}: {}", trend, attempt, proxy, ex.getMessage());
+                proxyManager.markBad(proxy);
+                break;
             } catch (Exception ex) {
                 log.warn("Selenium Google Search news scrape attempt {} failed for trend={}: {}", attempt, trend, ex.getMessage());
                 proxyManager.markBad(proxy);
             } finally {
                 quitDriver(driver);
+                cleanupProfileDir(driverSession);
             }
 
             randomSleep(1000, 3000);
@@ -175,18 +200,15 @@ public class SeleniumTrendScraper {
         return scrapeGoogleNewsViaRss(trend, searchUrl, maxArticlesPerTrend, extractor);
     }
 
-    private ChromeDriver createStealthChromeDriver(String proxy) {
-        ChromeOptions options = buildChromeOptions(proxy);
+    private DriverSession createStealthChromeDriver(String proxy, int attempt) throws Exception {
+        Path profileDir = resolveProfileDir(attempt);
+        ChromeOptions options = buildChromeOptions(proxy, profileDir);
         ChromeDriver driver = new ChromeDriver(options);
         applyStealthCdp(driver);
-        return driver;
+        return new DriverSession(driver, profileDir);
     }
 
-    private ChromeOptions buildChromeOptions() {
-        return buildChromeOptions(null);
-    }
-
-    private ChromeOptions buildChromeOptions(String proxy) {
+    private ChromeOptions buildChromeOptions(String proxy, Path profileDir) {
         ChromeOptions options = new ChromeOptions();
         if (seleniumHeadless) {
             options.addArguments("--headless=new");
@@ -197,7 +219,7 @@ public class SeleniumTrendScraper {
         options.addArguments("--disable-blink-features=AutomationControlled");
         options.addArguments("--lang=en-US,en;q=0.9");
         options.addArguments("--user-agent=" + REALISTIC_USER_AGENT);
-        options.addArguments("--user-data-dir=profile");
+        options.addArguments("--user-data-dir=" + profileDir.toAbsolutePath());
         options.setExperimentalOption("excludeSwitches", List.of("enable-automation"));
         options.setExperimentalOption("useAutomationExtension", false);
 
@@ -482,6 +504,38 @@ public class SeleniumTrendScraper {
                 .filter(p -> !p.isBlank())
                 .toList();
     }
+
+    private Path resolveProfileDir(int attempt) throws Exception {
+        if (persistentProfileEnabled) {
+            Path base = Path.of(seleniumUserDataDir).toAbsolutePath();
+            Files.createDirectories(base);
+            return base;
+        }
+
+        Path tempDir = Files.createTempDirectory("selenium-profile-" + attempt + "-");
+        tempDir.toFile().deleteOnExit();
+        return tempDir;
+    }
+
+    private void cleanupProfileDir(DriverSession session) {
+        if (session == null || session.profileDir() == null || persistentProfileEnabled) {
+            return;
+        }
+
+        try {
+            Files.walk(session.profileDir())
+                    .sorted((a, b) -> b.compareTo(a))
+                    .forEach(path -> {
+                        try {
+                            Files.deleteIfExists(path);
+                        } catch (Exception ignored) {
+                        }
+                    });
+        } catch (Exception ignored) {
+        }
+    }
+
+    private record DriverSession(ChromeDriver driver, Path profileDir) {}
 
     private class ProxyManager {
         private final List<String> proxies;
