@@ -11,11 +11,6 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import de.l3s.boilerpipe.extractors.ArticleExtractor;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.impl.client.LaxRedirectStrategy;
 import org.jsoup.select.Elements;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -200,66 +195,6 @@ public class TrendArticleService {
         result.put("keywords", defaultKeywordsForTrend(trend));
         return result;
     }
-
-    public Map<String, String> resolveFirstGoogleNewsRssResult(String query, String language, String geo, String ceid) {
-        String cleanedQuery = clean(query);
-        if (cleanedQuery.isBlank()) {
-            throw new WorkflowStepException(HttpStatus.BAD_REQUEST, "query must not be blank", List.of("invalid_query"));
-        }
-
-        String rssUrl = buildGoogleNewsRssSearchUrl(cleanedQuery, language, geo, ceid);
-        try {
-            Document rssDoc = Jsoup.connect(rssUrl)
-                    .ignoreContentType(true)
-                    .userAgent("Mozilla/5.0")
-                    .timeout(15000)
-                    .get();
-
-            String rssItemLink = extractFirstLinkFromRssDocument(rssDoc);
-            if (rssItemLink.isBlank()) {
-                throw new WorkflowStepException(HttpStatus.NOT_FOUND, "No Google News RSS item found for query", List.of("no_rss_item_found"));
-            }
-
-            String resolvedUrl = resolveOriginalNewsUrl(rssItemLink);
-            if (clean(resolvedUrl).isBlank()) {
-                throw new WorkflowStepException(HttpStatus.NOT_FOUND, "Could not resolve original URL from RSS item", List.of("rss_resolve_failed"));
-            }
-
-            Map<String, String> response = new LinkedHashMap<>();
-            response.put("query", cleanedQuery);
-            response.put("rssUrl", rssUrl);
-            response.put("rssItemLink", rssItemLink);
-            response.put("resolvedUrl", resolvedUrl);
-            return response;
-        } catch (WorkflowStepException ex) {
-            throw ex;
-        } catch (Exception ex) {
-            throw new WorkflowStepException(HttpStatus.NOT_FOUND, "Failed to fetch or parse Google News RSS", List.of(clean(ex.getMessage())));
-        }
-    }
-
-    String buildGoogleNewsRssSearchUrl(String query, String language, String geo, String ceid) {
-        String hl = clean(language).isBlank() ? "en-US" : clean(language);
-        String gl = clean(geo).isBlank() ? "US" : clean(geo);
-        String ceidValue = clean(ceid).isBlank() ? "US:en" : clean(ceid);
-        return "https://news.google.com/rss/search?q=" + urlEncode(query)
-                + "&hl=" + urlEncode(hl)
-                + "&gl=" + urlEncode(gl)
-                + "&ceid=" + urlEncode(ceidValue);
-    }
-
-    String extractFirstLinkFromRssDocument(Document rssDoc) {
-        if (rssDoc == null) {
-            return "";
-        }
-        Element firstLink = rssDoc.selectFirst("item > link, entry > link[href], channel item link");
-        if (firstLink == null) {
-            return "";
-        }
-        String href = clean(firstLink.attr("href"));
-        return !href.isBlank() ? href : clean(firstLink.text());
-    }
-
     List<String> fetchGoogleTrends(String geo, String language, int maxTrends) {
         List<String> seleniumTrends = seleniumTrendScraper.scrapeTrends(googleTrendsUrl, geo, language, maxTrends, this);
         if (!seleniumTrends.isEmpty()) {
@@ -790,7 +725,14 @@ public class TrendArticleService {
 
             // Follow redirects for news.google.com wrapper links.
             if (host.contains("news.google.")) {
-                String finalUrl = resolveFinalUrlWithApacheClient(link);
+                String finalUrl = Jsoup.connect(link)
+                        .followRedirects(true)
+                        .ignoreContentType(true)
+                        .userAgent("Mozilla/5.0")
+                        .timeout(15000)
+                        .execute()
+                        .url()
+                        .toExternalForm();
                 if (finalUrl != null && !finalUrl.isBlank()) {
                     return finalUrl;
                 }
@@ -799,28 +741,6 @@ public class TrendArticleService {
             log.debug("Could not resolve original news URL for {}: {}", link, ex.getMessage());
         }
         return link;
-    }
-
-    String resolveFinalUrlWithApacheClient(String redirectUrl) {
-        try (CloseableHttpClient client = HttpClients.custom()
-                .setRedirectStrategy(new LaxRedirectStrategy())
-                .build()) {
-
-            HttpGet request = new HttpGet(redirectUrl);
-            request.setHeader("User-Agent", "Mozilla/5.0");
-
-            try (CloseableHttpResponse response = client.execute(request)) {
-                URI finalUri = request.getURI();
-                if (finalUri != null) {
-                    return finalUri.toString();
-                }
-                int statusCode = response.getStatusLine().getStatusCode();
-                return statusCode >= 200 && statusCode < 400 ? redirectUrl : "";
-            }
-        } catch (Exception ex) {
-            log.debug("Apache redirect resolution failed for {}: {}", redirectUrl, ex.getMessage());
-            return "";
-        }
     }
 
     Map<String, String> parseQueryParams(String rawQuery) {
