@@ -35,7 +35,7 @@ public class TrendArticleController {
     })
     public ResponseEntity<TrendArticleResponse> createTrendingArticle(@Valid @RequestBody TrendArticleRequest request) {
         log.info("Trend article request received: geo={}, language={}, maxTrends={}, maxNewsPerTrend={}, publish={}",
-                request.getGeo(), request.getLanguage(), request.getMaxTrends(), request.getMaxNewsPerTrend(), request.isPublish());
+                request.getGeo(), request.getLanguage(), request.getMaxTrends(), request.getMaxNewsPerTrend(), request.shouldPublish());
 
         TrendArticleResponse response = trendArticleService.createAndOptionallyPublish(request);
         log.info("Trend article request completed: trends={}, generatedArticles={}",

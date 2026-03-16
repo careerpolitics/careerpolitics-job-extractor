@@ -27,9 +27,13 @@ public class TrendArticleRequest {
     @Schema(description = "Maximum number of news headlines collected for each trend", example = "3", minimum = "1", maximum = "10", defaultValue = "3")
     private int maxNewsPerTrend = 3;
 
-    @Schema(description = "Whether to publish to CareerPolitics article API after generation", example = "true", defaultValue = "true")
-    private boolean publish = true;
+    @Schema(description = "Whether article should be published at CareerPolitics article API", example = "false", defaultValue = "false")
+    private Boolean publish = false;
 
     @Schema(description = "Fallback trend keywords used if Google Trends is unavailable")
     private List<String> fallbackTrends;
+
+    public boolean shouldPublish() {
+        return Boolean.TRUE.equals(publish);
+    }
 }

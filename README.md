@@ -83,7 +83,7 @@ Optional env vars:
 - For production, configure PostgreSQL datasource and Spring profiles
 ## Trending Jobs/Education Article Generation
 
-A new endpoint discovers Google Trends topics in India (jobs/education), researches each trend via Google Trends (Selenium/page scrape) and Google Search news results from multiple sources, enriches context with media (photos/videos from source links + YouTube/social links), auto-selects a cover image when available, and generates a detailed Claude via OpenRouter markdown article for **each** trend topic. Optionally, each generated article is published to the CareerPolitics article API.
+A new endpoint discovers Google Trends topics in India (jobs/education), researches each trend via Google Trends (Selenium/page scrape) and Google Search news results from multiple sources, enriches context with media (photos/videos from source links + YouTube/social links), auto-selects a cover image when available, and generates a detailed Claude via OpenRouter markdown article for **each** trend topic. For each generated article, the API request to CareerPolitics article API is sent with `published` flag based on request (`true`/`false`, default `false`).
 
 ### Endpoint
 `POST /api/careerpolitics/content/trends/article`
@@ -99,7 +99,7 @@ Example request:
   "language": "en-US",
   "maxTrends": 5,
   "maxNewsPerTrend": 3,
-  "publish": true,
+  "publish": false,
   "fallbackTrends": ["UPSC", "NEET", "Campus Placements"]
 }
 ```
@@ -115,6 +115,6 @@ Example request:
 - Optional: `careerpolitics.content.youtube-rss-url` for YouTube media discovery
 
 ### Notes
-- Google Trends/Google Search can block automated scraping; if trend scraping fails, provide `fallbackTrends`.
-- If `publish` is false, the API only returns generated content without posting.
+- If `fallbackTrends` is provided, those values are used with higher priority than live trend scraping.
+- API sends article payload to CareerPolitics endpoint with `article.published` set from `publish` (`false` by default when omitted).
 - Google Search/Google News wrapped links are resolved to original publisher URLs before snippet/media extraction.

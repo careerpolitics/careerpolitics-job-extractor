@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import de.l3s.boilerpipe.extractors.ArticleExtractor;
 import org.jsoup.select.Elements;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -67,11 +68,16 @@ public class TrendArticleService {
     private String articleApiToken;
 
     public TrendArticleResponse createAndOptionallyPublish(TrendArticleRequest request) {
-        List<String> trends = fetchGoogleTrends(request.getGeo(), request.getLanguage(), request.getMaxTrends());
-        log.info("Discovered {} trend topics for geo={} language={}", trends.size(), request.getGeo(), request.getLanguage());
-        if (trends.isEmpty() && request.getFallbackTrends() != null) {
-            trends = request.getFallbackTrends().stream().filter(Objects::nonNull).map(String::trim)
-                    .filter(s -> !s.isBlank()).limit(request.getMaxTrends()).toList();
+        List<String> trends = request.getFallbackTrends() != null
+                ? request.getFallbackTrends().stream().filter(Objects::nonNull).map(String::trim)
+                .filter(s -> !s.isBlank()).limit(request.getMaxTrends()).toList()
+                : List.of();
+
+        if (!trends.isEmpty()) {
+            log.info("Using {} fallback trends from request with priority", trends.size());
+        } else {
+            trends = fetchGoogleTrends(request.getGeo(), request.getLanguage(), request.getMaxTrends());
+            log.info("Discovered {} trend topics for geo={} language={}", trends.size(), request.getGeo(), request.getLanguage());
         }
         if (trends.isEmpty()) {
             throw new IllegalStateException("Could not scrape trending topics from Google Trends and no fallbackTrends were provided");
@@ -101,12 +107,9 @@ public class TrendArticleService {
             String title = String.valueOf(articleData.getOrDefault("title", trend + " - Latest Jobs & Education Update"));
             String markdown = String.valueOf(articleData.getOrDefault("markdown", ""));
 
-            Map<String, Object> publishResponse = null;
-            boolean published = false;
-            if (request.isPublish()) {
-                publishResponse = publishToCareerPolitics(title, markdown, tags, trend, newsItems, coverImage);
-                published = Boolean.TRUE.equals(publishResponse.get("success"));
-            }
+            boolean requestedPublished = request.shouldPublish();
+            Map<String, Object> publishResponse = publishToCareerPolitics(title, markdown, tags, trend, newsItems, coverImage, requestedPublished);
+            boolean published = requestedPublished && Boolean.TRUE.equals(publishResponse.get("success"));
 
             generatedArticles.add(TrendGeneratedArticle.builder()
                     .trend(trend)
@@ -448,7 +451,7 @@ public class TrendArticleService {
         }
     }
 
-    Map<String, Object> publishToCareerPolitics(String title, String markdown, List<String> tags, String trend, List<TrendNewsItem> newsItems, String coverImage) {
+    Map<String, Object> publishToCareerPolitics(String title, String markdown, List<String> tags, String trend, List<TrendNewsItem> newsItems, String coverImage, boolean published) {
         if (articleApiUrl == null || articleApiUrl.isBlank()) {
             return Map.of(
                     "success", false,
@@ -466,14 +469,14 @@ public class TrendArticleService {
         articlePayload.put("title", title);
         articlePayload.put("description", description);
         articlePayload.put("body_markdown", safeMarkdown);
-        articlePayload.put("published", true);
+        articlePayload.put("published", published);
         articlePayload.put("tags", safeTags);
         if (coverImage != null && !coverImage.isBlank()) {
             articlePayload.put("main_image", coverImage);
         }
         payload.put("article", articlePayload);
         payload.put("meta", Map.of(
-                "source", "google-trends-plus-news-rss",
+                "source", "google-trends-plus-google-search",
                 "trend", trend,
                 "headlines", newsItems.stream().map(TrendNewsItem::getTitle).toList()
         ));
@@ -589,12 +592,27 @@ public class TrendArticleService {
 
     String fetchArticleSnippet(String link) {
         try {
-            Document articleDoc = Jsoup.connect(link).userAgent("Mozilla/5.0").timeout(10000).get();
-            String metaDescription = firstNonBlank(articleDoc.select("meta[name=description]").attr("content"), articleDoc.select("meta[property=og:description]").attr("content"));
-            if (!metaDescription.isBlank()) return clean(metaDescription);
-            Element firstParagraph = articleDoc.selectFirst("article p, main p, p");
-            return clean(firstParagraph != null ? firstParagraph.text() : "");
+            Document articleDoc = Jsoup.connect(link)
+                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                    .header("Accept-Language", "en-US,en;q=0.9")
+                    .timeout(15000)
+                    .get();
+
+            String html = articleDoc.body() != null ? articleDoc.body().html() : "";
+            String articleText = ArticleExtractor.INSTANCE.getText(html);
+
+            if (articleText == null || articleText.isBlank()) {
+                return "";
+            }
+
+            String normalized = clean(articleText);
+            int maxLength = 500;
+            if (normalized.length() > maxLength) {
+                return normalized.substring(0, maxLength) + "...";
+            }
+            return normalized;
         } catch (Exception ex) {
+            log.debug("Failed to fetch article snippet for {}: {}", link, ex.getMessage());
             return "";
         }
     }
