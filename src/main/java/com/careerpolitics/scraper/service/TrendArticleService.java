@@ -11,12 +11,11 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import de.l3s.boilerpipe.extractors.ArticleExtractor;
-import org.apache.hc.client5.http.classic.methods.HttpGet;
-import org.apache.hc.client5.http.classic.methods.HttpUriRequest;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.client5.http.impl.LaxRedirectStrategy;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.impl.client.LaxRedirectStrategy;
 import org.jsoup.select.Elements;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -807,15 +806,16 @@ public class TrendArticleService {
                 .setRedirectStrategy(new LaxRedirectStrategy())
                 .build()) {
 
-            HttpUriRequest request = new HttpGet(redirectUrl);
+            HttpGet request = new HttpGet(redirectUrl);
             request.setHeader("User-Agent", "Mozilla/5.0");
 
             try (CloseableHttpResponse response = client.execute(request)) {
-                URI finalUri = request.getUri();
+                URI finalUri = request.getURI();
                 if (finalUri != null) {
                     return finalUri.toString();
                 }
-                return response.getCode() >= 200 && response.getCode() < 400 ? redirectUrl : "";
+                int statusCode = response.getStatusLine().getStatusCode();
+                return statusCode >= 200 && statusCode < 400 ? redirectUrl : "";
             }
         } catch (Exception ex) {
             log.debug("Apache redirect resolution failed for {}: {}", redirectUrl, ex.getMessage());
