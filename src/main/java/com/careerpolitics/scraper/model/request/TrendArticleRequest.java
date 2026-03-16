@@ -14,7 +14,7 @@ public class TrendArticleRequest {
     @Schema(description = "Country/region code for Google Trends", example = "IN", defaultValue = "IN")
     private String geo = "IN";
 
-    @Schema(description = "Language locale for Trends discovery", example = "en-US", defaultValue = "en-US")
+    @Schema(description = "Language locale for trend/news discovery and article generation output", example = "en-US", defaultValue = "en-US")
     private String language = "en-US";
 
     @Min(1)

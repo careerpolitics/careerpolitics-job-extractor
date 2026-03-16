@@ -96,7 +96,7 @@ Example request:
 ```json
 {
   "geo": "IN",
-  "language": "en-US",
+  "language": "en-US", // set hi-IN, bn-IN, ta-IN, etc. to generate in that language
   "maxTrends": 5,
   "maxNewsPerTrend": 3,
   "publish": false,
@@ -112,6 +112,7 @@ Example request:
 - Optional: `SELENIUM_NEWS_ENABLED` (default `true`) to enable Selenium-based Google Search news scraping
 - Optional: `SELENIUM_HEADLESS` (default `false`) to open browser window for debugging when Selenium runs
 - Optional: `SELENIUM_TIMEOUT_SECONDS` (default `20`) for Selenium wait timeout
+- `language` request field also controls article output language (for example: `en-US`, `hi-IN`, `ta-IN`).
 - Optional: `careerpolitics.content.youtube-rss-url` for YouTube media discovery
 
 ### Notes

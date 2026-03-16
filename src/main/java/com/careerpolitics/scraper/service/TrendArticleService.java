@@ -115,7 +115,7 @@ public class TrendArticleService {
 
             Map<String, Object> articleData;
             try {
-                articleData = generateArticleWithClaudeViaOpenRouter(trend, newsItems, mediaItems, coverImage);
+                articleData = generateArticleWithClaudeViaOpenRouter(trend, newsItems, mediaItems, coverImage, request.getLanguage());
             } catch (Exception ex) {
                 stepErrors.add("article_generation_failed: " + clean(ex.getMessage()));
                 workflowErrors.add("AI generation failed for trend " + trend + ": " + clean(ex.getMessage()));
@@ -455,7 +455,7 @@ public class TrendArticleService {
         }
     }
 
-    Map<String, Object> generateArticleWithClaudeViaOpenRouter(String trend, List<TrendNewsItem> newsItems, List<TrendMediaItem> mediaItems, String coverImage) {
+    Map<String, Object> generateArticleWithClaudeViaOpenRouter(String trend, List<TrendNewsItem> newsItems, List<TrendMediaItem> mediaItems, String coverImage, String requestedLanguage) {
         if (openRouterApiKey == null || openRouterApiKey.isBlank()) {
             throw new IllegalStateException("OpenRouter API key is missing. Set careerpolitics.content.ai.openrouter.api-key");
         }
@@ -465,16 +465,47 @@ public class TrendArticleService {
         String mediaText = mediaItems.stream().map(m -> "- " + m.getType() + " | " + m.getTitle() + " | " + m.getUrl())
                 .collect(Collectors.joining("\n"));
 
-        String prompt = "Create ONE detailed, engaging, SEO-friendly markdown article for trend: " + trend + ". " +
-                "Decide the best article structure dynamically based on the provided facts. " +
-                "Write in clear human language with compelling intro and strong narrative flow. " +
-                "Must include: what happened, why trending, timeline, key statements/reactions, context, and practical impact. " +
-                "Use headings/subheadings, bullet points, and short readable paragraphs. " +
-                "Must include '## Sources' with at least 3 references, and '## Media' with relevant embeds/links. " +
-                "If cover image is provided, reference it in markdown at top using a standard image markdown line. " +
-                "Return strict JSON with keys: title, markdown, tags(array), keywords(array).\n\n" +
-                "Cover image: " + (coverImage == null ? "" : coverImage) + "\n\n" +
-                "News sources:\n" + sourcesText + "\n\nMedia candidates:\n" + mediaText;
+        String outputLanguage = resolveOutputLanguage(requestedLanguage);
+        String prompt = String.format("""
+                Platform: CareerPolitics (government jobs, exams, results, current affairs)
+                Goal: Rank on Google and drive high traffic with high-quality, trustworthy content.
+
+                Task:
+                Create ONE reusable, topic-agnostic, SEO-optimized markdown article for trend: %s.
+                Article language: %s.
+
+                Writing requirements:
+                - Use clear, human, journalistic language (no fluff).
+                - Decide article structure dynamically from available facts.
+                - Include: what happened, why trending, timeline, official statements/reactions, and impact on aspirants/students/job seekers.
+                - Use proper headings/subheadings, short paragraphs, and bullet points.
+                - Include a concise FAQ section with 3-5 questions.
+                - Include "## Sources" with referenced links from provided data.
+                - Include "## Media" with relevant embeds/links from provided media candidates.
+                - If cover image exists, place it at the top in markdown image format.
+                - Keep claims factual and grounded in provided inputs. If information is missing, state uncertainty explicitly.
+
+                SEO requirements:
+                - Create a compelling, search-friendly title.
+                - Add high-intent keywords naturally in intro and subheadings.
+                - Return tags and keywords that are relevant to jobs/exams/current affairs audience.
+
+                Output format:
+                Return STRICT JSON only with keys:
+                - title (string)
+                - markdown (string)
+                - tags (array of strings)
+                - keywords (array of strings)
+
+                Cover image:
+                %s
+
+                News sources:
+                %s
+
+                Media candidates:
+                %s
+                """, trend, outputLanguage, (coverImage == null ? "" : coverImage), sourcesText, mediaText);
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", openRouterModel);
@@ -659,11 +690,16 @@ public class TrendArticleService {
             }
 
             String normalized = clean(articleText);
-            int maxLength = 500;
-            if (normalized.length() > maxLength) {
-                return normalized.substring(0, maxLength) + "...";
+            int maxLength = 4000;
+            if (normalized.length() <= maxLength) {
+                return normalized;
             }
-            return normalized;
+
+            int boundary = normalized.lastIndexOf('.', maxLength);
+            if (boundary < 800) {
+                boundary = maxLength;
+            }
+            return normalized.substring(0, boundary).trim() + "...";
         } catch (Exception ex) {
             log.debug("Failed to fetch article snippet for {}: {}", link, ex.getMessage());
             return "";
@@ -720,6 +756,20 @@ public class TrendArticleService {
             params.put(key, value);
         }
         return params;
+    }
+
+    private String resolveOutputLanguage(String requestedLanguage) {
+        String lang = clean(requestedLanguage).toLowerCase(Locale.ROOT);
+        if (lang.startsWith("hi")) return "Hindi";
+        if (lang.startsWith("bn")) return "Bengali";
+        if (lang.startsWith("ta")) return "Tamil";
+        if (lang.startsWith("te")) return "Telugu";
+        if (lang.startsWith("mr")) return "Marathi";
+        if (lang.startsWith("gu")) return "Gujarati";
+        if (lang.startsWith("kn")) return "Kannada";
+        if (lang.startsWith("ml")) return "Malayalam";
+        if (lang.startsWith("pa")) return "Punjabi";
+        return "English";
     }
 
     private String textOf(Element parent, String selector) {
