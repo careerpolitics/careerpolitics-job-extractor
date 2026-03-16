@@ -65,6 +65,17 @@ careerpolitics:
     article-api:
       url: ${CAREERPOLITICS_ARTICLE_API_URL:}
       token: ${CAREERPOLITICS_ARTICLE_API_TOKEN:}
+    trends:
+      scheduler:
+        enabled: ${TRENDS_SCHEDULER_ENABLED:false}
+        cron: ${TRENDS_SCHEDULER_CRON:0 0 * * * *}
+        geo: ${TRENDS_SCHEDULER_GEO:IN}
+        language: ${TRENDS_SCHEDULER_LANGUAGE:en-US}
+        max-trends: ${TRENDS_SCHEDULER_MAX_TRENDS:3}
+        max-news-per-trend: ${TRENDS_SCHEDULER_MAX_NEWS_PER_TREND:3}
+        trend-cooldown-hours: ${TRENDS_SCHEDULER_TREND_COOLDOWN_HOURS:24}
+        publish: ${TRENDS_SCHEDULER_PUBLISH:true}
+        fallback-trends: ${TRENDS_SCHEDULER_FALLBACK_TRENDS:}
 
 # API Documentation
 api:

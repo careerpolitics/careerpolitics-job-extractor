@@ -45,6 +45,21 @@ services:
       - key: SELENIUM_MAX_ATTEMPTS
         scope: RUN_TIME
         value: "3"
+      - key: TRENDS_SCHEDULER_ENABLED
+        scope: RUN_TIME
+        value: "true"
+      - key: TRENDS_SCHEDULER_CRON
+        scope: RUN_TIME
+        value: "0 0 * * * *"
+      - key: TRENDS_SCHEDULER_PUBLISH
+        scope: RUN_TIME
+        value: "true"
+      - key: TRENDS_SCHEDULER_TREND_COOLDOWN_HOURS
+        scope: RUN_TIME
+        value: "24"
+      - key: SELENIUM_TIMEOUT_SECONDS
+        scope: RUN_TIME
+        value: "25"
       - key: SELENIUM_MANUAL_VERIFICATION_WAIT_ENABLED
         scope: RUN_TIME
         value: "false"

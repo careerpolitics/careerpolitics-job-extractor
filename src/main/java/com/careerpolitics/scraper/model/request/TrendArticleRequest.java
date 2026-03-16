@@ -27,6 +27,12 @@ public class TrendArticleRequest {
     @Schema(description = "Maximum number of news headlines collected for each trend", example = "3", minimum = "1", maximum = "10", defaultValue = "3")
     private int maxNewsPerTrend = 3;
 
+
+    @Min(1)
+    @Max(168)
+    @Schema(description = "Do not repeat same trend within this cooldown window (hours)", example = "24", minimum = "1", maximum = "168", defaultValue = "24")
+    private int trendCooldownHours = 24;
+
     @Schema(description = "Whether article should be published at CareerPolitics article API", example = "false", defaultValue = "false")
     private Boolean publish = false;
 

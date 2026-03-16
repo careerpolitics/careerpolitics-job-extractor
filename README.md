@@ -101,6 +101,7 @@ Example request:
   "language": "en-US", // set hi-IN, bn-IN, ta-IN, etc. to generate in that language
   "maxTrends": 5,
   "maxNewsPerTrend": 3,
+  "trendCooldownHours": 24,
   "publish": false,
   "fallbackTrends": ["UPSC", "NEET", "Campus Placements"]
 }
@@ -114,10 +115,17 @@ Example request:
 - Optional: `SELENIUM_NEWS_ENABLED` (default `true`) to enable Selenium-based Google Search news scraping
 - Optional: `SELENIUM_HEADLESS` (default `false`) to open browser window for debugging when Selenium runs
 - Optional: `SELENIUM_TIMEOUT_SECONDS` (default `20`) for Selenium wait timeout
+- Optional: `TRENDS_SCHEDULER_ENABLED` (default `false`) to run automatic hourly `/trends/article` pipeline
+- Optional: `TRENDS_SCHEDULER_CRON` (default `0 0 * * * *`) for schedule control (hourly by default)
+- Optional: `TRENDS_SCHEDULER_TREND_COOLDOWN_HOURS` (default `24`) to reduce repeating the same trend
 - Optional: `SELENIUM_MANUAL_VERIFICATION_WAIT_ENABLED` (default `true`) waits when Google bot-check appears so you can manually verify in browser.
 - Optional: `SELENIUM_MANUAL_VERIFICATION_MAX_WAIT_SECONDS` (default `180`) maximum wait for manual verification completion.
 - `language` request field also controls article output language (for example: `en-US`, `hi-IN`, `ta-IN`).
 - Optional: `careerpolitics.content.youtube-rss-url` for YouTube media discovery
+
+
+### Automatic hourly run (extract + post article)
+When `TRENDS_SCHEDULER_ENABLED=true`, the service triggers the same trend article pipeline every hour (cron default `0 0 * * * *`). It generates and publishes posts automatically and applies trend cooldown filtering so recently used trend slugs are deprioritized for the next runs.
 
 ### Notes
 - Error responses: API returns structured error JSON for workflow failures (e.g., no trends found, no news found for all trends).
