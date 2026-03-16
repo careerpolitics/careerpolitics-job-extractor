@@ -112,6 +112,8 @@ Example request:
 - Optional: `SELENIUM_NEWS_ENABLED` (default `true`) to enable Selenium-based Google Search news scraping
 - Optional: `SELENIUM_HEADLESS` (default `false`) to open browser window for debugging when Selenium runs
 - Optional: `SELENIUM_TIMEOUT_SECONDS` (default `20`) for Selenium wait timeout
+- Optional: `SELENIUM_MANUAL_VERIFICATION_WAIT_ENABLED` (default `true`) waits when Google bot-check appears so you can manually verify in browser.
+- Optional: `SELENIUM_MANUAL_VERIFICATION_MAX_WAIT_SECONDS` (default `180`) maximum wait for manual verification completion.
 - `language` request field also controls article output language (for example: `en-US`, `hi-IN`, `ta-IN`).
 - Optional: `careerpolitics.content.youtube-rss-url` for YouTube media discovery
 

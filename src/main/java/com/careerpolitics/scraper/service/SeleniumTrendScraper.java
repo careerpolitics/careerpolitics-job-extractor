@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
 
 @Slf4j
 @Component
@@ -32,6 +33,12 @@ public class SeleniumTrendScraper {
 
     @Value("${careerpolitics.content.selenium.headless:false}")
     private boolean seleniumHeadless;
+
+    @Value("${careerpolitics.content.selenium.manual-verification-wait-enabled:true}")
+    private boolean manualVerificationWaitEnabled;
+
+    @Value("${careerpolitics.content.selenium.manual-verification-max-wait-seconds:180}")
+    private int manualVerificationMaxWaitSeconds;
 
     public List<String> scrapeTrends(String trendsUrl, String geo, String language, int maxTrends, TrendArticleService extractor) {
         if (!seleniumEnabled) {
@@ -107,6 +114,7 @@ public class SeleniumTrendScraper {
 
                 dismissConsentIfPresent(driver);
                 ensureNewsTab(driver, searchUrl);
+                waitForManualVerificationIfNeeded(driver, trend);
 
                 new WebDriverWait(driver, Duration.ofSeconds(Math.max(8, timeoutSeconds)))
                         .until(d -> !d.findElements(By.cssSelector("div.SoaBEf, div.dbsr, div.MjjYud, g-card, article, a.WlydOe")).isEmpty());
@@ -194,6 +202,63 @@ public class SeleniumTrendScraper {
             }
         } catch (Exception ex) {
             log.debug("Could not force news tab: {}", ex.getMessage());
+        }
+    }
+
+
+    private void waitForManualVerificationIfNeeded(WebDriver driver, String trend) {
+        if (!manualVerificationWaitEnabled) {
+            return;
+        }
+
+        if (seleniumHeadless) {
+            log.warn("Manual verification wait is enabled but Selenium is headless. Set SELENIUM_HEADLESS=false to solve bot checks interactively.");
+        }
+
+        if (!isLikelyBotCheckPage(driver)) {
+            return;
+        }
+
+        int maxWait = Math.max(30, manualVerificationMaxWaitSeconds);
+        log.warn("Google bot-check detected for trend={}. Please complete 'I'm human' verification in browser. Waiting up to {} seconds...", trend, maxWait);
+
+        long deadline = System.currentTimeMillis() + (maxWait * 1000L);
+        while (System.currentTimeMillis() < deadline) {
+            try {
+                if (!isLikelyBotCheckPage(driver)) {
+                    log.info("Bot-check cleared by user for trend={}.", trend);
+                    return;
+                }
+                Thread.sleep(1000);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                return;
+            } catch (Exception ignored) {
+            }
+        }
+
+        log.warn("Timed out waiting for manual bot-check verification for trend={}", trend);
+    }
+
+    private boolean isLikelyBotCheckPage(WebDriver driver) {
+        try {
+            String title = String.valueOf(driver.getTitle()).toLowerCase(Locale.ROOT);
+            String body = String.valueOf(driver.getPageSource()).toLowerCase(Locale.ROOT);
+
+            boolean hasChallengeFrame = !driver.findElements(By.cssSelector("iframe[src*='recaptcha'], iframe[title*='challenge'], iframe[src*='sorry']")).isEmpty();
+            boolean hasNewsCards = !driver.findElements(By.cssSelector("div.SoaBEf, div.dbsr, div.MjjYud, g-card, article, a.WlydOe")).isEmpty();
+
+            boolean challengeText = title.contains("unusual traffic")
+                    || title.contains("sorry")
+                    || body.contains("verify you are human")
+                    || body.contains("i'm not a robot")
+                    || body.contains("unusual traffic")
+                    || body.contains("complete the captcha")
+                    || body.contains("g-recaptcha");
+
+            return (hasChallengeFrame || challengeText) && !hasNewsCards;
+        } catch (Exception ex) {
+            return false;
         }
     }
 
