@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Service
 public class TrendArticleSchedulerService {
 
-    private final TrendArticleService trendArticleService;
+    private final TrendArticleWorkflowService trendArticleWorkflowService;
     private final AtomicBoolean running = new AtomicBoolean(false);
 
     @Value("${careerpolitics.content.trends.scheduler.enabled:false}")
@@ -40,8 +40,8 @@ public class TrendArticleSchedulerService {
     @Value("${careerpolitics.content.trends.scheduler.fallback-trends:}")
     private List<String> fallbackTrends;
 
-    public TrendArticleSchedulerService(TrendArticleService trendArticleService) {
-        this.trendArticleService = trendArticleService;
+    public TrendArticleSchedulerService(TrendArticleWorkflowService trendArticleWorkflowService) {
+        this.trendArticleWorkflowService = trendArticleWorkflowService;
     }
 
     @Scheduled(cron = "${careerpolitics.content.trends.scheduler.cron:0 0 * * * *}")
@@ -69,7 +69,7 @@ public class TrendArticleSchedulerService {
                     fallbackTrends == null || fallbackTrends.isEmpty() ? null : fallbackTrends
             );
 
-            var response = trendArticleService.createAndOptionallyPublish(request);
+            var response = trendArticleWorkflowService.createAndOptionallyPublish(request);
             log.info(
                     "Scheduled trend article run completed: trendsProcessed={}, generatedArticles={}",
                     response.getTrends() != null ? response.getTrends().size() : 0,

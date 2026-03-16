@@ -13,7 +13,7 @@ class TrendArticleServiceTest {
 
     @Test
     void extractTrendsFromDocument_shouldIgnoreNavigationLinksAndPreferTableRows() {
-        TrendArticleService service = new TrendArticleService(new ObjectMapper(), new SeleniumTrendScraper(), new TrendDiversityService());
+        TrendArticleService service = new TrendArticleService(new ObjectMapper(), new SeleniumTrendScraper());
 
         String html = """
                 <html>
@@ -51,7 +51,7 @@ class TrendArticleServiceTest {
 
     @Test
     void extractTrendsFromDocument_shouldRemoveTrendMetadataNoise() {
-        TrendArticleService service = new TrendArticleService(new ObjectMapper(), new SeleniumTrendScraper(), new TrendDiversityService());
+        TrendArticleService service = new TrendArticleService(new ObjectMapper(), new SeleniumTrendScraper());
 
         String html = """
                 <html><body><main>
@@ -71,7 +71,7 @@ class TrendArticleServiceTest {
 
     @Test
     void parseGoogleSearchNewsDocument_shouldExtractHeadlineDetails() {
-        TrendArticleService service = new TrendArticleService(new ObjectMapper(), new SeleniumTrendScraper(), new TrendDiversityService());
+        TrendArticleService service = new TrendArticleService(new ObjectMapper(), new SeleniumTrendScraper());
 
         String html = """
                 <html><body>
@@ -96,7 +96,7 @@ class TrendArticleServiceTest {
 
     @Test
     void normalizeTag_shouldConvertToAsciiSlug() {
-        TrendArticleService service = new TrendArticleService(new ObjectMapper(), new SeleniumTrendScraper(), new TrendDiversityService());
+        TrendArticleService service = new TrendArticleService(new ObjectMapper(), new SeleniumTrendScraper());
 
         assertEquals("rrbclerk", service.normalizeTag("rrb clerk"));
         assertEquals("mainsresult", service.normalizeTag("mains result"));
@@ -106,7 +106,7 @@ class TrendArticleServiceTest {
 
     @Test
     void resolveOriginalNewsUrl_shouldPreferWrappedQueryUrl() {
-        TrendArticleService service = new TrendArticleService(new ObjectMapper(), new SeleniumTrendScraper(), new TrendDiversityService());
+        TrendArticleService service = new TrendArticleService(new ObjectMapper(), new SeleniumTrendScraper());
 
         String wrapped = "https://news.google.com/rss/articles/CBMiX2h0dHBzOi8vbmV3cy5zaXRlL2FydGljbGXSAQA?oc=5&url=https%3A%2F%2Fpublisher.com%2Fstory%3Fid%3D1";
         String resolved = service.resolveOriginalNewsUrl(wrapped);
@@ -116,7 +116,7 @@ class TrendArticleServiceTest {
 
     @Test
     void parseQueryParams_shouldDecodeValues() {
-        TrendArticleService service = new TrendArticleService(new ObjectMapper(), new SeleniumTrendScraper(), new TrendDiversityService());
+        TrendArticleService service = new TrendArticleService(new ObjectMapper(), new SeleniumTrendScraper());
 
         var params = service.parseQueryParams("url=https%3A%2F%2Fexample.com%2Fa%3Fx%3D1&hl=en-US");
         assertEquals("https://example.com/a?x=1", params.get("url"));

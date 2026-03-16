@@ -15,18 +15,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ThreadLocalRandom;
 
 @Slf4j
 @Service
 public class TrendDiversityService {
-
-    private static final List<String> NEWS_QUERY_SUFFIXES = List.of(
-            "jobs education",
-            "exam update recruitment",
-            "career policy education",
-            "hiring entrance exam"
-    );
 
     private final TrendArticleHistoryRepository trendArticleHistoryRepository;
 
@@ -103,11 +95,6 @@ public class TrendDiversityService {
         } catch (Exception ex) {
             log.warn("Failed to save trend history for trend={}: {}", trend, ex.getMessage());
         }
-    }
-
-    String buildSearchQueryForTrendNews(String trend, String geo) {
-        String suffix = NEWS_QUERY_SUFFIXES.get(ThreadLocalRandom.current().nextInt(NEWS_QUERY_SUFFIXES.size()));
-        return trend + " " + suffix + " " + geo;
     }
 
     private String clean(String value) {
