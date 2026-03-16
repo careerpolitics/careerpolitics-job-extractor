@@ -1,5 +1,6 @@
 package com.careerpolitics.scraper.service;
 
+import com.careerpolitics.scraper.model.response.TrendNewsItem;
 import io.github.bonigarcia.wdm.WebDriverManager;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
@@ -64,10 +65,9 @@ public class SeleniumTrendScraper {
                 new WebDriverWait(driver, Duration.ofSeconds(Math.max(8, timeoutSeconds)))
                         .until(d -> !d.findElements(By.cssSelector("table tr, [data-row-id], [data-term], .mZ3RIc, .QNIh4d")).isEmpty());
 
-                if (driver instanceof JavascriptExecutor js) {
-                    js.executeScript("window.scrollTo(0, document.body.scrollHeight * 0.5);");
-                    Thread.sleep(1000);
-                }
+                JavascriptExecutor js = (JavascriptExecutor) driver;
+                js.executeScript("window.scrollTo(0, document.body.scrollHeight * 0.5);");
+                Thread.sleep(1000);
 
                 String html = driver.getPageSource();
                 Document doc = Jsoup.parse(html);
@@ -119,10 +119,9 @@ public class SeleniumTrendScraper {
                 new WebDriverWait(driver, Duration.ofSeconds(Math.max(8, timeoutSeconds)))
                         .until(d -> !d.findElements(By.cssSelector("div.SoaBEf, div.dbsr, div.MjjYud, g-card, article, a.WlydOe")).isEmpty());
 
-                if (driver instanceof JavascriptExecutor js) {
-                    js.executeScript("window.scrollTo(0, document.body.scrollHeight * 0.75);");
-                    Thread.sleep(1200);
-                }
+                JavascriptExecutor js = (JavascriptExecutor) driver;
+                js.executeScript("window.scrollTo(0, document.body.scrollHeight * 0.75);");
+                Thread.sleep(1200);
 
                 String html = driver.getPageSource();
                 List<TrendNewsItem> newsItems = extractor.parseGoogleSearchNewsDocument(Jsoup.parse(html, searchUrl), trend, maxArticlesPerTrend);
@@ -170,7 +169,7 @@ public class SeleniumTrendScraper {
             for (By by : consentButtons) {
                 List<WebElement> buttons = driver.findElements(by);
                 if (!buttons.isEmpty()) {
-                    buttons.get(0).click();
+                    buttons.getFirst().click();
                     Thread.sleep(700);
                     return;
                 }
@@ -189,7 +188,7 @@ public class SeleniumTrendScraper {
 
             List<WebElement> newsTab = driver.findElements(By.cssSelector("a[href*='tbm=nws']"));
             if (!newsTab.isEmpty()) {
-                newsTab.get(0).click();
+                newsTab.getFirst().click();
                 Thread.sleep(900);
                 return;
             }
@@ -215,7 +214,7 @@ public class SeleniumTrendScraper {
             log.warn("Manual verification wait is enabled but Selenium is headless. Set SELENIUM_HEADLESS=false to solve bot checks interactively.");
         }
 
-        if (!isLikelyBotCheckPage(driver)) {
+        if (isLikelyBotCheckPage(driver)) {
             return;
         }
 
@@ -225,7 +224,7 @@ public class SeleniumTrendScraper {
         long deadline = System.currentTimeMillis() + (maxWait * 1000L);
         while (System.currentTimeMillis() < deadline) {
             try {
-                if (!isLikelyBotCheckPage(driver)) {
+                if (isLikelyBotCheckPage(driver)) {
                     log.info("Bot-check cleared by user for trend={}.", trend);
                     return;
                 }
@@ -256,9 +255,9 @@ public class SeleniumTrendScraper {
                     || body.contains("complete the captcha")
                     || body.contains("g-recaptcha");
 
-            return (hasChallengeFrame || challengeText) && !hasNewsCards;
+            return (!hasChallengeFrame && !challengeText) || hasNewsCards;
         } catch (Exception ex) {
-            return false;
+            return true;
         }
     }
 
