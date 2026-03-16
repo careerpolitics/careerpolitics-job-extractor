@@ -124,3 +124,18 @@ Example request:
 - If `fallbackTrends` is provided, those values are used with higher priority than live trend scraping.
 - API sends article payload to CareerPolitics endpoint with `article.published` set from `publish` (`false` by default when omitted).
 - Google Search/Google News wrapped links are resolved to original publisher URLs before snippet/media extraction.
+
+
+## DigitalOcean App Platform Deployment
+
+- App spec file: `.do/app.yaml`
+- Step-by-step guide: `docs/digitalocean-app-platform.md`
+
+Quick deploy with CLI:
+```bash
+doctl apps create --spec .do/app.yaml
+```
+
+
+### App Platform Docker build note
+The Dockerfile builds the JAR inside a multi-stage build, so App Platform does not require a prebuilt `build/libs/*.jar` artifact in the repo context.

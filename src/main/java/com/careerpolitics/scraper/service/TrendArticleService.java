@@ -258,7 +258,7 @@ public class TrendArticleService {
                 this
         );
         if (!seleniumItems.isEmpty()) {
-            log.info("Using Selenium Google Search news results for trend={} count={}", trend, seleniumItems.size());
+            log.info("Using discovered news results for trend={} count={}", trend, seleniumItems.size());
             return selectBalancedNewsItems(seleniumItems, maxArticlesPerTrend);
         }
 

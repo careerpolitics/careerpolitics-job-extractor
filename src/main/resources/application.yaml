@@ -53,6 +53,10 @@ careerpolitics:
       manual-verification-wait-enabled: ${SELENIUM_MANUAL_VERIFICATION_WAIT_ENABLED:true}
       manual-verification-max-wait-seconds: ${SELENIUM_MANUAL_VERIFICATION_MAX_WAIT_SECONDS:180}
       timeout-seconds: ${SELENIUM_TIMEOUT_SECONDS:20}
+      max-attempts: ${SELENIUM_MAX_ATTEMPTS:5}
+      proxy-pool: ${SELENIUM_PROXY_POOL:}
+      persistent-profile-enabled: ${SELENIUM_PERSISTENT_PROFILE_ENABLED:false}
+      user-data-dir: ${SELENIUM_USER_DATA_DIR:profile}
     ai:
       openrouter:
         base-url: https://openrouter.ai/api/v1
@@ -98,4 +102,4 @@ logging:
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
 
 server:
-  port: 8080
+  port: ${PORT:8080}
