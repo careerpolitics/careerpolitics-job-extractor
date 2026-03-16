@@ -1,10 +1,8 @@
 package com.careerpolitics.scraper.service;
 
 import com.careerpolitics.scraper.exception.WorkflowStepException;
-import com.careerpolitics.scraper.model.TrendArticleHistory;
 import com.careerpolitics.scraper.model.request.TrendArticleRequest;
 import com.careerpolitics.scraper.model.response.*;
-import com.careerpolitics.scraper.repository.TrendArticleHistoryRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +11,7 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import de.l3s.boilerpipe.extractors.ArticleExtractor;
 import org.jsoup.select.Elements;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -25,9 +24,7 @@ import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -44,18 +41,20 @@ public class TrendArticleService {
 
     private final ObjectMapper objectMapper;
     private final SeleniumTrendScraper seleniumTrendScraper;
-    private final TrendArticleHistoryRepository trendArticleHistoryRepository;
+    private final TrendDiversityService trendDiversityService;
 
+    @Autowired
     public TrendArticleService(ObjectMapper objectMapper,
                                SeleniumTrendScraper seleniumTrendScraper,
-                               TrendArticleHistoryRepository trendArticleHistoryRepository) {
+                               TrendDiversityService trendDiversityService) {
         this.objectMapper = objectMapper;
         this.seleniumTrendScraper = seleniumTrendScraper;
-        this.trendArticleHistoryRepository = trendArticleHistoryRepository;
+        this.trendDiversityService = trendDiversityService;
     }
 
-    TrendArticleService(ObjectMapper objectMapper, SeleniumTrendScraper seleniumTrendScraper) {
-        this(objectMapper, seleniumTrendScraper, null);
+    TrendArticleService(ObjectMapper objectMapper,
+                        SeleniumTrendScraper seleniumTrendScraper) {
+        this(objectMapper, seleniumTrendScraper, new TrendDiversityService());
     }
 
     @Value("${careerpolitics.content.google-trends-url:https://trends.google.com/trending}")
@@ -119,8 +118,17 @@ public class TrendArticleService {
     }
 
     public TrendArticleResponse createAndOptionallyPublish(TrendArticleRequest request) {
-        List<String> discoveredTrends = discoverTrends(request.getGeo(), request.getLanguage(), request.getMaxTrends(), request.getFallbackTrends());
-        List<String> trends = selectNonRepeatingTrends(discoveredTrends, request.getMaxTrends(), request.getTrendCooldownHours());
+        List<String> discoveredTrends = discoverTrends(
+                request.getGeo(),
+                request.getLanguage(),
+                request.getMaxTrends(),
+                request.getFallbackTrends()
+        );
+        List<String> trends = trendDiversityService.selectNonRepeatingTrends(
+                discoveredTrends,
+                request.getMaxTrends(),
+                request.getTrendCooldownHours()
+        );
 
         if (trends.isEmpty()) {
             throw new WorkflowStepException(
@@ -138,14 +146,25 @@ public class TrendArticleService {
             List<String> stepErrors = new ArrayList<>();
             log.info("Processing trend: {}", trend);
 
-            List<TrendNewsItem> newsItems = discoverNewsForTrend(trend, request.getMaxNewsPerTrend(), request.getGeo(), request.getLanguage());
+            List<TrendNewsItem> newsItems = discoverNewsForTrend(
+                    trend,
+                    request.getMaxNewsPerTrend(),
+                    request.getGeo(),
+                    request.getLanguage()
+            );
             if (newsItems.isEmpty()) {
                 stepErrors.add("news_fetch_failed: no news found for trend=" + trend);
                 workflowErrors.add("No news found for trend: " + trend);
             }
             allNews.addAll(newsItems);
 
-            TrendMediaBundle mediaBundle = discoverMediaForTrend(trend, newsItems, request.getGeo(), request.getLanguage(), 8);
+            TrendMediaBundle mediaBundle = discoverMediaForTrend(
+                    trend,
+                    newsItems,
+                    request.getGeo(),
+                    request.getLanguage(),
+                    8
+            );
             List<TrendMediaItem> mediaItems = mediaBundle.items();
             if (mediaItems.isEmpty()) {
                 stepErrors.add("media_fetch_warning: no media extracted for trend=" + trend);
@@ -154,10 +173,18 @@ public class TrendArticleService {
 
             Map<String, Object> articleData;
             try {
-                articleData = generateArticleWithClaudeViaOpenRouter(trend, newsItems, mediaItems, coverImage, request.getLanguage());
+                articleData = generateArticleWithClaudeViaOpenRouter(
+                        trend,
+                        newsItems,
+                        mediaItems,
+                        coverImage,
+                        request.getLanguage()
+                );
             } catch (Exception ex) {
                 stepErrors.add("article_generation_failed: " + clean(ex.getMessage()));
-                workflowErrors.add("AI generation failed for trend " + trend + ": " + clean(ex.getMessage()));
+                workflowErrors.add(
+                        "AI generation failed for trend " + trend + ": " + clean(ex.getMessage())
+                );
                 articleData = fallbackArticleData(trend, newsItems, mediaItems, coverImage);
             }
 
@@ -165,17 +192,30 @@ public class TrendArticleService {
             List<String> tags = (List<String>) articleData.getOrDefault("tags", defaultTagsForTrend(trend));
             @SuppressWarnings("unchecked")
             List<String> keywords = (List<String>) articleData.getOrDefault("keywords", defaultKeywordsForTrend(trend));
-            String title = String.valueOf(articleData.getOrDefault("title", trend + " - Latest Jobs & Education Update"));
+            String title = String.valueOf(
+                    articleData.getOrDefault("title", trend + " - Latest Jobs & Education Update")
+            );
             String markdown = String.valueOf(articleData.getOrDefault("markdown", ""));
 
             boolean requestedPublished = request.shouldPublish();
-            Map<String, Object> publishResponse = publishToCareerPolitics(title, markdown, tags, trend, newsItems, coverImage, requestedPublished);
+            Map<String, Object> publishResponse = publishToCareerPolitics(
+                    title,
+                    markdown,
+                    tags,
+                    trend,
+                    newsItems,
+                    coverImage,
+                    requestedPublished
+            );
             boolean published = requestedPublished && Boolean.TRUE.equals(publishResponse.get("success"));
             if (!Boolean.TRUE.equals(publishResponse.get("success"))) {
-                stepErrors.add("publish_step_failed: " + clean(String.valueOf(publishResponse.getOrDefault("error", "unknown error"))));
+                String publishError = String.valueOf(
+                        publishResponse.getOrDefault("error", "unknown error")
+                );
+                stepErrors.add("publish_step_failed: " + clean(publishError));
             }
 
-            recordTrendHistory(trend, published);
+            trendDiversityService.recordTrendHistory(trend, published);
 
             generatedArticles.add(TrendGeneratedArticle.builder()
                     .trend(trend)
@@ -192,7 +232,8 @@ public class TrendArticleService {
                     .build());
         }
 
-        boolean allNewsMissing = generatedArticles.stream().allMatch(a -> a.getSources() == null || a.getSources().isEmpty());
+        boolean allNewsMissing = generatedArticles.stream()
+                .allMatch(a -> a.getSources() == null || a.getSources().isEmpty());
         if (allNewsMissing) {
             throw new WorkflowStepException(
                     HttpStatus.NOT_FOUND,
@@ -212,76 +253,6 @@ public class TrendArticleService {
                 .publishResponse(first != null ? first.getPublishResponse() : null)
                 .errors(workflowErrors)
                 .build();
-    }
-
-    List<String> selectNonRepeatingTrends(List<String> trends, int maxTrends, int cooldownHours) {
-        if (trends == null || trends.isEmpty()) {
-            return List.of();
-        }
-
-        LinkedHashMap<String, String> uniqueBySlug = new LinkedHashMap<>();
-        for (String trend : trends) {
-            String cleanedTrend = clean(trend);
-            if (cleanedTrend.isBlank()) {
-                continue;
-            }
-            uniqueBySlug.putIfAbsent(slug(cleanedTrend), cleanedTrend);
-        }
-
-        List<String> orderedUnique = new ArrayList<>(uniqueBySlug.values());
-        if (trendArticleHistoryRepository == null || cooldownHours <= 0) {
-            return orderedUnique.stream().limit(Math.max(1, maxTrends)).toList();
-        }
-
-        LocalDateTime cutoff = LocalDateTime.now().minusHours(cooldownHours);
-        Set<String> recentlyUsed = new HashSet<>(trendArticleHistoryRepository.findTrendSlugsUsedSince(cutoff));
-        Map<String, LocalDateTime> latestUseBySlug = new HashMap<>();
-        for (Object[] row : trendArticleHistoryRepository.findLatestGeneratedAtByTrendSlug()) {
-            if (row.length >= 2 && row[0] != null && row[1] instanceof LocalDateTime time) {
-                latestUseBySlug.put(String.valueOf(row[0]), time);
-            }
-        }
-
-        List<String> fresh = new ArrayList<>();
-        List<String> stale = new ArrayList<>();
-        for (String trend : orderedUnique) {
-            if (recentlyUsed.contains(slug(trend))) {
-                stale.add(trend);
-            } else {
-                fresh.add(trend);
-            }
-        }
-
-        stale.sort(Comparator.comparing(t -> latestUseBySlug.getOrDefault(slug(t), LocalDateTime.MIN)));
-
-        List<String> selected = new ArrayList<>();
-        selected.addAll(fresh);
-        if (selected.size() < maxTrends) {
-            for (String trend : stale) {
-                if (selected.size() >= maxTrends) {
-                    break;
-                }
-                selected.add(trend);
-            }
-        }
-
-        return selected.stream().limit(Math.max(1, maxTrends)).toList();
-    }
-
-    private void recordTrendHistory(String trend, boolean published) {
-        if (trendArticleHistoryRepository == null || trend == null || trend.isBlank()) {
-            return;
-        }
-
-        try {
-            TrendArticleHistory history = new TrendArticleHistory();
-            history.setTrend(clean(trend));
-            history.setTrendSlug(slug(trend));
-            history.setPublished(published);
-            trendArticleHistoryRepository.save(history);
-        } catch (Exception ex) {
-            log.warn("Failed to save trend history for trend={}: {}", trend, ex.getMessage());
-        }
     }
 
     private Map<String, Object> fallbackArticleData(String trend, List<TrendNewsItem> newsItems, List<TrendMediaItem> mediaItems, String coverImage) {
@@ -335,7 +306,7 @@ public class TrendArticleService {
 
     List<TrendNewsItem> gatherDetailsForTrend(String trend, int maxArticlesPerTrend, String geo, String language) {
         String newsSearchUrl = googleSearchUrl
-                + "?q=" + urlEncode(buildSearchQueryForTrendNews(trend, geo))
+                + "?q=" + urlEncode(trendDiversityService.buildSearchQueryForTrendNews(trend, geo))
                 + "&tbm=nws&hl=" + urlEncode(language)
                 + "&gl=" + urlEncode(geo)
                 + "&num=" + Math.max(10, maxArticlesPerTrend * 3);
@@ -353,17 +324,6 @@ public class TrendArticleService {
 
         log.warn("No news details fetched from Selenium for trend={}", trend);
         return List.of();
-    }
-
-    private String buildSearchQueryForTrendNews(String trend, String geo) {
-        List<String> suffixes = List.of(
-                "jobs education",
-                "exam update recruitment",
-                "career policy education",
-                "hiring entrance exam"
-        );
-        String suffix = suffixes.get(ThreadLocalRandom.current().nextInt(suffixes.size()));
-        return trend + " " + suffix + " " + geo;
     }
 
     private List<TrendNewsItem> selectBalancedNewsItems(List<TrendNewsItem> items, int maxArticlesPerTrend) {

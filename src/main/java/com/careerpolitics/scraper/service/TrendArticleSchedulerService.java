@@ -51,7 +51,9 @@ public class TrendArticleSchedulerService {
         }
 
         if (!running.compareAndSet(false, true)) {
-            log.warn("Skipping scheduled trend article run because previous execution is still running");
+            log.warn(
+                    "Skipping scheduled trend article run because previous execution is still running"
+            );
             return;
         }
 
@@ -63,12 +65,16 @@ public class TrendArticleSchedulerService {
             request.setMaxNewsPerTrend(Math.max(1, maxNewsPerTrend));
             request.setPublish(publish);
             request.setTrendCooldownHours(Math.max(1, trendCooldownHours));
-            request.setFallbackTrends(fallbackTrends == null || fallbackTrends.isEmpty() ? null : fallbackTrends);
+            request.setFallbackTrends(
+                    fallbackTrends == null || fallbackTrends.isEmpty() ? null : fallbackTrends
+            );
 
             var response = trendArticleService.createAndOptionallyPublish(request);
-            log.info("Scheduled trend article run completed: trendsProcessed={}, generatedArticles={}",
+            log.info(
+                    "Scheduled trend article run completed: trendsProcessed={}, generatedArticles={}",
                     response.getTrends() != null ? response.getTrends().size() : 0,
-                    response.getArticles() != null ? response.getArticles().size() : 0);
+                    response.getArticles() != null ? response.getArticles().size() : 0
+            );
         } catch (Exception ex) {
             log.error("Scheduled trend article run failed", ex);
         } finally {
