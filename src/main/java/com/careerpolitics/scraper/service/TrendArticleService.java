@@ -594,9 +594,9 @@ public class TrendArticleService {
         if (newsItems == null || newsItems.isEmpty()) {
             return base;
         }
-        String first = clean(newsItems.getFirst().getSnippet());
+        String first = clean(newsItems.get(0).getSnippet());
         if (first.isBlank()) {
-            first = clean(newsItems.getFirst().getTitle());
+            first = clean(newsItems.get(0).getTitle());
         }
         String merged = (base + " " + first).trim();
         return merged.length() > 200 ? merged.substring(0, 200) : merged;
@@ -729,7 +729,7 @@ public class TrendArticleService {
     private void addIfValidTrend(String candidate, LinkedHashSet<String> trends, int maxTrends) {
         String cleaned = normalizeTrendCandidate(candidate);
         if (isLikelyTrendTerm(cleaned)) trends.add(cleaned);
-        while (trends.size() > maxTrends) trends.remove(trends.getFirst());
+        while (trends.size() > maxTrends) trends.remove(0);
     }
 
     private String normalizeTrendCandidate(String candidate) {

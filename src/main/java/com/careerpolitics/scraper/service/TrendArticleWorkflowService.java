@@ -4,6 +4,7 @@ import com.careerpolitics.scraper.exception.WorkflowStepException;
 import com.careerpolitics.scraper.model.request.TrendArticleRequest;
 import com.careerpolitics.scraper.model.response.TrendArticleResponse;
 import com.careerpolitics.scraper.model.response.TrendGeneratedArticle;
+import com.careerpolitics.scraper.model.response.TrendMediaBundle;
 import com.careerpolitics.scraper.model.response.TrendMediaItem;
 import com.careerpolitics.scraper.model.response.TrendNewsItem;
 import org.springframework.http.HttpStatus;
@@ -152,7 +153,7 @@ public class TrendArticleWorkflowService {
             );
         }
 
-        TrendGeneratedArticle first = generatedArticles.getFirst();
+        TrendGeneratedArticle first = generatedArticles.get(0);
         return TrendArticleResponse.builder()
                 .trends(trends)
                 .news(allNews)
