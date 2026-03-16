@@ -135,3 +135,7 @@ Quick deploy with CLI:
 ```bash
 doctl apps create --spec .do/app.yaml
 ```
+
+
+### App Platform Docker build note
+The Dockerfile builds the JAR inside a multi-stage build, so App Platform does not require a prebuilt `build/libs/*.jar` artifact in the repo context.
