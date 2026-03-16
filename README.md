@@ -115,6 +115,7 @@ Example request:
 - Optional: `careerpolitics.content.youtube-rss-url` for YouTube media discovery
 
 ### Notes
+- Error responses: API returns structured error JSON for workflow failures (e.g., no trends found, no news found for all trends).
 - If `fallbackTrends` is provided, those values are used with higher priority than live trend scraping.
 - API sends article payload to CareerPolitics endpoint with `article.published` set from `publish` (`false` by default when omitted).
 - Google Search/Google News wrapped links are resolved to original publisher URLs before snippet/media extraction.

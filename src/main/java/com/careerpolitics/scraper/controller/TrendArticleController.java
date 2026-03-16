@@ -31,6 +31,7 @@ public class TrendArticleController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Article generated successfully"),
             @ApiResponse(responseCode = "400", description = "Invalid request payload"),
+            @ApiResponse(responseCode = "404", description = "No trend/news data found"),
             @ApiResponse(responseCode = "500", description = "Generation or publishing failed")
     })
     public ResponseEntity<TrendArticleResponse> createTrendingArticle(@Valid @RequestBody TrendArticleRequest request) {

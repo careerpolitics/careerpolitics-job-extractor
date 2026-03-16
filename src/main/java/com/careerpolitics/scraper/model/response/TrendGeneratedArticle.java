@@ -19,4 +19,5 @@ public class TrendGeneratedArticle {
     private String coverImage;
     private boolean published;
     private Map<String, Object> publishResponse;
+    private List<String> errors;
 }

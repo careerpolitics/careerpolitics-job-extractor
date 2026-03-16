@@ -18,4 +18,5 @@ public class TrendArticleResponse {
     private String generatedMarkdown;
     private boolean published;
     private Map<String, Object> publishResponse;
+    private List<String> errors;
 }
