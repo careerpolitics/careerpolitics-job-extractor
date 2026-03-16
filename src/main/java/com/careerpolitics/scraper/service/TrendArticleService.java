@@ -11,6 +11,12 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import de.l3s.boilerpipe.extractors.ArticleExtractor;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.classic.methods.HttpUriRequest;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.LaxRedirectStrategy;
 import org.jsoup.select.Elements;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -785,14 +791,7 @@ public class TrendArticleService {
 
             // Follow redirects for news.google.com wrapper links.
             if (host.contains("news.google.")) {
-                String finalUrl = Jsoup.connect(link)
-                        .followRedirects(true)
-                        .ignoreContentType(true)
-                        .userAgent("Mozilla/5.0")
-                        .timeout(15000)
-                        .execute()
-                        .url()
-                        .toExternalForm();
+                String finalUrl = resolveFinalUrlWithApacheClient(link);
                 if (finalUrl != null && !finalUrl.isBlank()) {
                     return finalUrl;
                 }
@@ -801,6 +800,27 @@ public class TrendArticleService {
             log.debug("Could not resolve original news URL for {}: {}", link, ex.getMessage());
         }
         return link;
+    }
+
+    String resolveFinalUrlWithApacheClient(String redirectUrl) {
+        try (CloseableHttpClient client = HttpClients.custom()
+                .setRedirectStrategy(new LaxRedirectStrategy())
+                .build()) {
+
+            HttpUriRequest request = new HttpGet(redirectUrl);
+            request.setHeader("User-Agent", "Mozilla/5.0");
+
+            try (CloseableHttpResponse response = client.execute(request)) {
+                URI finalUri = request.getUri();
+                if (finalUri != null) {
+                    return finalUri.toString();
+                }
+                return response.getCode() >= 200 && response.getCode() < 400 ? redirectUrl : "";
+            }
+        } catch (Exception ex) {
+            log.debug("Apache redirect resolution failed for {}: {}", redirectUrl, ex.getMessage());
+            return "";
+        }
     }
 
     Map<String, String> parseQueryParams(String rawQuery) {
