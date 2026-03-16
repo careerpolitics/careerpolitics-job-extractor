@@ -68,18 +68,43 @@ public class TrendArticleService {
     @Value("${careerpolitics.content.article-api.token:}")
     private String articleApiToken;
 
-    public TrendArticleResponse createAndOptionallyPublish(TrendArticleRequest request) {
-        List<String> trends = request.getFallbackTrends() != null
-                ? request.getFallbackTrends().stream().filter(Objects::nonNull).map(String::trim)
-                .filter(v -> !v.isBlank()).limit(request.getMaxTrends()).toList()
+
+    public List<String> discoverTrends(String geo, String language, int maxTrends, List<String> fallbackTrends) {
+        List<String> cleanedFallbackTrends = fallbackTrends != null
+                ? fallbackTrends.stream().filter(Objects::nonNull).map(String::trim)
+                .filter(v -> !v.isBlank()).limit(maxTrends).toList()
                 : List.of();
 
-        if (!trends.isEmpty()) {
-            log.info("Using {} fallback trends from request with priority", trends.size());
-        } else {
-            trends = fetchGoogleTrends(request.getGeo(), request.getLanguage(), request.getMaxTrends());
-            log.info("Discovered {} trend topics for geo={} language={}", trends.size(), request.getGeo(), request.getLanguage());
+        if (!cleanedFallbackTrends.isEmpty()) {
+            log.info("Using {} fallback trends from request with priority", cleanedFallbackTrends.size());
+            return cleanedFallbackTrends;
         }
+
+        List<String> trends = fetchGoogleTrends(geo, language, maxTrends);
+        log.info("Discovered {} trend topics for geo={} language={}", trends.size(), geo, language);
+        return trends;
+    }
+
+    public List<TrendNewsItem> discoverNewsForTrend(String trend, int maxNewsPerTrend, String geo, String language) {
+        return gatherDetailsForTrend(trend, maxNewsPerTrend, geo, language);
+    }
+
+    public TrendMediaBundle discoverMediaForTrend(String trend,
+                                                  List<TrendNewsItem> newsItems,
+                                                  String geo,
+                                                  String language,
+                                                  int maxMediaItems) {
+        List<TrendNewsItem> safeNewsItems = newsItems == null ? List.of() : newsItems;
+        List<TrendMediaItem> mediaItems = new ArrayList<>();
+        mediaItems.addAll(extractMediaFromNewsLinks(trend, safeNewsItems));
+        mediaItems.addAll(gatherMediaForTrend(trend, geo, language));
+
+        List<TrendMediaItem> trimmed = mediaItems.stream().distinct().limit(Math.max(1, maxMediaItems)).toList();
+        return new TrendMediaBundle(trimmed, pickCoverImage(trimmed));
+    }
+
+    public TrendArticleResponse createAndOptionallyPublish(TrendArticleRequest request) {
+        List<String> trends = discoverTrends(request.getGeo(), request.getLanguage(), request.getMaxTrends(), request.getFallbackTrends());
 
         if (trends.isEmpty()) {
             throw new WorkflowStepException(
@@ -97,21 +122,19 @@ public class TrendArticleService {
             List<String> stepErrors = new ArrayList<>();
             log.info("Processing trend: {}", trend);
 
-            List<TrendNewsItem> newsItems = gatherDetailsForTrend(trend, request.getMaxNewsPerTrend(), request.getGeo(), request.getLanguage());
+            List<TrendNewsItem> newsItems = discoverNewsForTrend(trend, request.getMaxNewsPerTrend(), request.getGeo(), request.getLanguage());
             if (newsItems.isEmpty()) {
                 stepErrors.add("news_fetch_failed: no news found for trend=" + trend);
                 workflowErrors.add("No news found for trend: " + trend);
             }
             allNews.addAll(newsItems);
 
-            List<TrendMediaItem> mediaItems = new ArrayList<>();
-            mediaItems.addAll(extractMediaFromNewsLinks(trend, newsItems));
-            mediaItems.addAll(gatherMediaForTrend(trend, request.getGeo(), request.getLanguage()));
-            mediaItems = mediaItems.stream().distinct().limit(8).toList();
+            TrendMediaBundle mediaBundle = discoverMediaForTrend(trend, newsItems, request.getGeo(), request.getLanguage(), 8);
+            List<TrendMediaItem> mediaItems = mediaBundle.items();
             if (mediaItems.isEmpty()) {
                 stepErrors.add("media_fetch_warning: no media extracted for trend=" + trend);
             }
-            String coverImage = pickCoverImage(mediaItems);
+            String coverImage = mediaBundle.coverImage();
 
             Map<String, Object> articleData;
             try {
@@ -742,6 +765,8 @@ public class TrendArticleService {
         }
         return link;
     }
+
+    public record TrendMediaBundle(List<TrendMediaItem> items, String coverImage) {}
 
     Map<String, String> parseQueryParams(String rawQuery) {
         Map<String, String> params = new LinkedHashMap<>();
