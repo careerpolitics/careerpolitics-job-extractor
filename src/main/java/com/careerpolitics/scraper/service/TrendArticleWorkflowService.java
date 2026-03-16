@@ -67,7 +67,7 @@ public class TrendArticleWorkflowService {
             }
             allNews.addAll(newsItems);
 
-            TrendMediaBundle mediaBundle = trendArticleService.discoverMediaForTrend(
+            TrendArticleService.TrendMediaBundle mediaBundle = trendArticleService.discoverMediaForTrend(
                     trend,
                     newsItems,
                     request.getGeo(),

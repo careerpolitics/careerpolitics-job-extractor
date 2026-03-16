@@ -11,7 +11,7 @@ RUN chmod +x gradlew \
     && cp build/libs/*.jar /workspace/app.jar
 
 # Runtime stage
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:21-jre-alpine
 
 LABEL maintainer="CareerPolitics Team <support@careerpolitics.com>"
 LABEL version="1.0.0"
