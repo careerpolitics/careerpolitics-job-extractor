@@ -88,7 +88,9 @@ A new endpoint discovers Google Trends topics in India (jobs/education), researc
 ### Endpoint
 `POST /api/careerpolitics/content/trends/article`
 
-All APIs are documented in Swagger/OpenAPI (including this endpoint):
+`GET /api/careerpolitics/content/news/rss/resolve-first?query=ssc&hl=en-US&gl=US&ceid=US:en`
+
+All APIs are documented in Swagger/OpenAPI (including these endpoints):
 - Swagger UI: `/swagger-ui/index.html`
 - OpenAPI JSON: `/v3/api-docs`
 

@@ -11,9 +11,11 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Slf4j
@@ -24,6 +26,26 @@ import org.springframework.web.bind.annotation.RestController;
 public class TrendArticleController {
 
     private final TrendArticleService trendArticleService;
+
+
+    @GetMapping("/news/rss/resolve-first")
+    @Operation(summary = "Resolve first Google News RSS result to original publisher URL",
+            description = "Fetches Google News RSS search feed for the query, picks first item, and resolves it to the original URL.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "URL resolved successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid request"),
+            @ApiResponse(responseCode = "404", description = "No RSS item found or unable to resolve URL")
+    })
+    public ResponseEntity<java.util.Map<String, String>> resolveFirstGoogleNewsRssUrl(
+            @RequestParam("query") String query,
+            @RequestParam(value = "hl", defaultValue = "en-US") String language,
+            @RequestParam(value = "gl", defaultValue = "US") String geo,
+            @RequestParam(value = "ceid", defaultValue = "US:en") String ceid
+    ) {
+        log.info("RSS resolve request received: query={}, hl={}, gl={}, ceid={}", query, language, geo, ceid);
+        java.util.Map<String, String> response = trendArticleService.resolveFirstGoogleNewsRssResult(query, language, geo, ceid);
+        return ResponseEntity.ok(response);
+    }
 
     @PostMapping("/trends/article")
     @Operation(summary = "Fetch Google trends + news, generate AI article, and optionally publish",

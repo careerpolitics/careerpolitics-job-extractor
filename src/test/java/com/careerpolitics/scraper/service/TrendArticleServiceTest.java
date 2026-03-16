@@ -114,6 +114,22 @@ class TrendArticleServiceTest {
         assertEquals("https://publisher.com/story?id=1", resolved);
     }
 
+
+    @Test
+    void extractFirstLinkFromRssDocument_shouldReturnFirstItemLink() {
+        TrendArticleService service = new TrendArticleService(new ObjectMapper(), new SeleniumTrendScraper());
+
+        String xml = """
+                <rss><channel>
+                  <item><title>News 1</title><link>https://news.google.com/rss/articles/abc?oc=5</link></item>
+                  <item><title>News 2</title><link>https://news.google.com/rss/articles/def?oc=5</link></item>
+                </channel></rss>
+                """;
+
+        String link = service.extractFirstLinkFromRssDocument(Jsoup.parse(xml, "", org.jsoup.parser.Parser.xmlParser()));
+        assertEquals("https://news.google.com/rss/articles/abc?oc=5", link);
+    }
+
     @Test
     void parseQueryParams_shouldDecodeValues() {
         TrendArticleService service = new TrendArticleService(new ObjectMapper(), new SeleniumTrendScraper());

@@ -196,6 +196,65 @@ public class TrendArticleService {
         return result;
     }
 
+    public Map<String, String> resolveFirstGoogleNewsRssResult(String query, String language, String geo, String ceid) {
+        String cleanedQuery = clean(query);
+        if (cleanedQuery.isBlank()) {
+            throw new WorkflowStepException(HttpStatus.BAD_REQUEST, "query must not be blank", List.of("invalid_query"));
+        }
+
+        String rssUrl = buildGoogleNewsRssSearchUrl(cleanedQuery, language, geo, ceid);
+        try {
+            Document rssDoc = Jsoup.connect(rssUrl)
+                    .ignoreContentType(true)
+                    .userAgent("Mozilla/5.0")
+                    .timeout(15000)
+                    .get();
+
+            String rssItemLink = extractFirstLinkFromRssDocument(rssDoc);
+            if (rssItemLink.isBlank()) {
+                throw new WorkflowStepException(HttpStatus.NOT_FOUND, "No Google News RSS item found for query", List.of("no_rss_item_found"));
+            }
+
+            String resolvedUrl = resolveOriginalNewsUrl(rssItemLink);
+            if (clean(resolvedUrl).isBlank()) {
+                throw new WorkflowStepException(HttpStatus.NOT_FOUND, "Could not resolve original URL from RSS item", List.of("rss_resolve_failed"));
+            }
+
+            Map<String, String> response = new LinkedHashMap<>();
+            response.put("query", cleanedQuery);
+            response.put("rssUrl", rssUrl);
+            response.put("rssItemLink", rssItemLink);
+            response.put("resolvedUrl", resolvedUrl);
+            return response;
+        } catch (WorkflowStepException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new WorkflowStepException(HttpStatus.NOT_FOUND, "Failed to fetch or parse Google News RSS", List.of(clean(ex.getMessage())));
+        }
+    }
+
+    String buildGoogleNewsRssSearchUrl(String query, String language, String geo, String ceid) {
+        String hl = clean(language).isBlank() ? "en-US" : clean(language);
+        String gl = clean(geo).isBlank() ? "US" : clean(geo);
+        String ceidValue = clean(ceid).isBlank() ? "US:en" : clean(ceid);
+        return "https://news.google.com/rss/search?q=" + urlEncode(query)
+                + "&hl=" + urlEncode(hl)
+                + "&gl=" + urlEncode(gl)
+                + "&ceid=" + urlEncode(ceidValue);
+    }
+
+    String extractFirstLinkFromRssDocument(Document rssDoc) {
+        if (rssDoc == null) {
+            return "";
+        }
+        Element firstLink = rssDoc.selectFirst("item > link, entry > link[href], channel item link");
+        if (firstLink == null) {
+            return "";
+        }
+        String href = clean(firstLink.attr("href"));
+        return !href.isBlank() ? href : clean(firstLink.text());
+    }
+
     List<String> fetchGoogleTrends(String geo, String language, int maxTrends) {
         List<String> seleniumTrends = seleniumTrendScraper.scrapeTrends(googleTrendsUrl, geo, language, maxTrends, this);
         if (!seleniumTrends.isEmpty()) {
