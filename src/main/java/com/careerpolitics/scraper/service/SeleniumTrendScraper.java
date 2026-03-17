@@ -48,7 +48,7 @@ public class SeleniumTrendScraper {
     @Value("${careerpolitics.content.selenium.news-enabled:true}")
     private boolean seleniumNewsEnabled;
 
-    @Value("${careerpolitics.content.selenium.headless:true}")
+    @Value("${careerpolitics.content.selenium.headless:false}")
     private boolean seleniumHeadless;
 
     @Value("${careerpolitics.content.selenium.manual-verification-wait-enabled:true}")
@@ -73,153 +73,143 @@ public class SeleniumTrendScraper {
 
 
     public List<String> scrapeTrends(String trendsUrl, String geo, String language, int maxTrends, TrendArticleService extractor) {
-        try {
-            if (!seleniumEnabled) {
-                return List.of();
-            }
-
-            String url = trendsUrl + "?geo=" + extractor.urlEncodePublic(geo) + "&hl=" + extractor.urlEncodePublic(language)
-                    + "&category=9&status=active";
-
-            if (!setupChromeDriverBinary()) {
-                return List.of();
-            }
-
-            int effectiveAttempts = seleniumHeadless ? Math.max(1, maxAttempts) : 1;
-            for (int attempt = 1; attempt <= effectiveAttempts; attempt++) {
-                WebDriver driver = null;
-                DriverSession driverSession = null;
-                try {
-                    driverSession = createStealthChromeDriver(null, attempt);
-                    driver = driverSession.driver();
-                    driver.get(url);
-
-                    new WebDriverWait(driver, Duration.ofSeconds(Math.max(8, timeoutSeconds)))
-                            .until(d -> d.getPageSource() != null && d.getPageSource().contains("<body"));
-
-                    simulateHumanBrowsing(driver, null);
-
-                    new WebDriverWait(driver, Duration.ofSeconds(Math.max(8, timeoutSeconds)))
-                            .until(d -> !d.findElements(By.cssSelector("table tr, [data-row-id], [data-term], .mZ3RIc, .QNIh4d")).isEmpty());
-
-                    JavascriptExecutor js = (JavascriptExecutor) driver;
-                    js.executeScript("window.scrollTo(0, document.body.scrollHeight * 0.5);");
-                    Thread.sleep(1000);
-
-                    String html = driver.getPageSource();
-                    Document doc = Jsoup.parse(html);
-                    List<String> trends = extractor.extractTrendsFromDocument(doc, maxTrends);
-                    if (!trends.isEmpty()) {
-                        log.info("Selenium trends scrape returned {} trends on attempt {}", trends.size(), attempt);
-                        return trends;
-                    }
-
-                    log.warn("Selenium trends scrape attempt {} returned 0 trends", attempt);
-                } catch (SessionNotCreatedException ex) {
-                    log.warn("Selenium trends session could not be created on attempt {}: {}", attempt, ex.getMessage());
-                    break;
-                } catch (Throwable ex) {
-                    log.warn("Selenium trends scrape attempt {} failed: {}", attempt, ex.getMessage());
-                } finally {
-                    quitDriver(driver);
-                    cleanupProfileDir(driverSession);
-                }
-
-                randomSleep(800, 2200);
-            }
-
-            return List.of();
-        } catch (Throwable throwable) {
-            log.error("Unexpected fatal Selenium trends error. Continuing without trends: {}", throwable.getMessage(), throwable);
+        if (!seleniumEnabled) {
             return List.of();
         }
+
+        String url = trendsUrl + "?geo=" + extractor.urlEncodePublic(geo) + "&hl=" + extractor.urlEncodePublic(language)
+                + "&category=9&status=active";
+
+        if (!setupChromeDriverBinary()) {
+            return List.of();
+        }
+
+        int effectiveAttempts = seleniumHeadless ? Math.max(1, maxAttempts) : 1;
+        for (int attempt = 1; attempt <= effectiveAttempts; attempt++) {
+            WebDriver driver = null;
+            DriverSession driverSession = null;
+            try {
+                driverSession = createStealthChromeDriver(null, attempt);
+                driver = driverSession.driver();
+                driver.get(url);
+
+                new WebDriverWait(driver, Duration.ofSeconds(Math.max(8, timeoutSeconds)))
+                        .until(d -> d.getPageSource() != null && d.getPageSource().contains("<body"));
+
+                simulateHumanBrowsing(driver, null);
+
+                new WebDriverWait(driver, Duration.ofSeconds(Math.max(8, timeoutSeconds)))
+                        .until(d -> !d.findElements(By.cssSelector("table tr, [data-row-id], [data-term], .mZ3RIc, .QNIh4d")).isEmpty());
+
+                JavascriptExecutor js = (JavascriptExecutor) driver;
+                js.executeScript("window.scrollTo(0, document.body.scrollHeight * 0.5);");
+                Thread.sleep(1000);
+
+                String html = driver.getPageSource();
+                Document doc = Jsoup.parse(html);
+                List<String> trends = extractor.extractTrendsFromDocument(doc, maxTrends);
+                if (!trends.isEmpty()) {
+                    log.info("Selenium trends scrape returned {} trends on attempt {}", trends.size(), attempt);
+                    return trends;
+                }
+
+                log.warn("Selenium trends scrape attempt {} returned 0 trends", attempt);
+            } catch (SessionNotCreatedException ex) {
+                log.warn("Selenium trends session could not be created on attempt {}: {}", attempt, ex.getMessage());
+                break;
+            } catch (Exception ex) {
+                log.warn("Selenium trends scrape attempt {} failed: {}", attempt, ex.getMessage());
+            } finally {
+                quitDriver(driver);
+                cleanupProfileDir(driverSession);
+            }
+
+            randomSleep(800, 2200);
+        }
+
+        return List.of();
     }
 
     public List<TrendNewsItem> scrapeGoogleSearchNews(String searchUrl, String trend, int maxArticlesPerTrend, TrendArticleService extractor) {
-        try {
-            if (!seleniumEnabled || !seleniumNewsEnabled) {
-                return List.of();
-            }
+        if (!seleniumEnabled || !seleniumNewsEnabled) {
+            return List.of();
+        }
 
-            if (!setupChromeDriverBinary()) {
-                return scrapeGoogleNewsViaRss(trend, searchUrl, maxArticlesPerTrend, extractor);
-            }
-            ProxyManager proxyManager = new ProxyManager(parseProxyPool(proxyPool));
-
-            int effectiveAttempts = seleniumHeadless ? Math.max(1, maxAttempts) : 1;
-            for (int attempt = 1; attempt <= effectiveAttempts; attempt++) {
-                String proxy = proxyManager.acquireProxy();
-                WebDriver driver = null;
-                DriverSession driverSession = null;
-                try {
-                    driverSession = createStealthChromeDriver(proxy, attempt);
-                    driver = driverSession.driver();
-                    driver.get(searchUrl);
-
-                    new WebDriverWait(driver, Duration.ofSeconds(Math.max(8, timeoutSeconds)))
-                            .until(d -> d.getPageSource() != null && d.getPageSource().contains("<body"));
-
-                    // Early bot-check detection and immediate proxy rotation.
-                    if (isLikelyBotCheckPage(driver)) {
-                        log.warn("Bot-check immediately detected for trend={} attempt={} proxy={}", trend, attempt, proxy);
-                        proxyManager.markBad(proxy);
-                        continue;
-                    }
-
-                    dismissConsentIfPresent(driver);
-                    ensureNewsTab(driver, searchUrl);
-                    simulateHumanBrowsing(driver, trend);
-
-                    boolean verificationCleared = waitForManualVerificationIfNeeded(driver, trend);
-                    if (!verificationCleared) {
-                        proxyManager.markBad(proxy);
-                        continue;
-                    }
-
-                    if (isLikelyBotCheckPage(driver)) {
-                        log.warn("Bot-check persisted after interaction for trend={} attempt={} proxy={}", trend, attempt, proxy);
-                        proxyManager.markBad(proxy);
-                        continue;
-                    }
-
-                    clickShowMoreIfPresent(driver);
-
-                    new WebDriverWait(driver, Duration.ofSeconds(Math.max(8, timeoutSeconds)))
-                            .until(d -> !d.findElements(By.cssSelector("div.SoaBEf, div.dbsr, div.MjjYud, g-card, article, a.WlydOe")).isEmpty());
-
-                    JavascriptExecutor js = (JavascriptExecutor) driver;
-                    js.executeScript("window.scrollTo(0, document.body.scrollHeight * 0.75);");
-                    Thread.sleep(1200);
-
-                    String html = driver.getPageSource();
-                    List<TrendNewsItem> newsItems = extractor.parseGoogleSearchNewsDocument(Jsoup.parse(html, searchUrl), trend, maxArticlesPerTrend);
-                    if (!newsItems.isEmpty()) {
-                        log.info("Selenium Google Search news scrape returned {} items for trend={} on attempt {}", newsItems.size(), trend, attempt);
-                        return newsItems;
-                    }
-
-                    log.warn("Selenium Google Search news scrape attempt {} returned 0 items for trend={}", attempt, trend);
-                } catch (SessionNotCreatedException ex) {
-                    log.warn("Selenium session could not be created for trend={} attempt={} proxy={}: {}", trend, attempt, proxy, ex.getMessage());
-                    proxyManager.markBad(proxy);
-                    break;
-                } catch (Throwable ex) {
-                    log.warn("Selenium Google Search news scrape attempt {} failed for trend={}: {}", attempt, trend, ex.getMessage());
-                    proxyManager.markBad(proxy);
-                } finally {
-                    quitDriver(driver);
-                    cleanupProfileDir(driverSession);
-                }
-
-                randomSleep(1000, 3000);
-            }
-
-            log.warn("Selenium scraping failed after retries for trend={}. Falling back to Google News RSS.", trend);
-            return scrapeGoogleNewsViaRss(trend, searchUrl, maxArticlesPerTrend, extractor);
-        } catch (Throwable throwable) {
-            log.error("Unexpected fatal Selenium news error for trend={}. Falling back to RSS: {}", trend, throwable.getMessage(), throwable);
+        if (!setupChromeDriverBinary()) {
             return scrapeGoogleNewsViaRss(trend, searchUrl, maxArticlesPerTrend, extractor);
         }
+        ProxyManager proxyManager = new ProxyManager(parseProxyPool(proxyPool));
+
+        int effectiveAttempts = seleniumHeadless ? Math.max(1, maxAttempts) : 1;
+        for (int attempt = 1; attempt <= effectiveAttempts; attempt++) {
+            String proxy = proxyManager.acquireProxy();
+            WebDriver driver = null;
+            DriverSession driverSession = null;
+            try {
+                driverSession = createStealthChromeDriver(proxy, attempt);
+                driver = driverSession.driver();
+                driver.get(searchUrl);
+
+                new WebDriverWait(driver, Duration.ofSeconds(Math.max(8, timeoutSeconds)))
+                        .until(d -> d.getPageSource() != null && d.getPageSource().contains("<body"));
+
+                // Early bot-check detection and immediate proxy rotation.
+                if (isLikelyBotCheckPage(driver)) {
+                    log.warn("Bot-check immediately detected for trend={} attempt={} proxy={}", trend, attempt, proxy);
+                    proxyManager.markBad(proxy);
+                    continue;
+                }
+
+                dismissConsentIfPresent(driver);
+                ensureNewsTab(driver, searchUrl);
+                simulateHumanBrowsing(driver, trend);
+
+                boolean verificationCleared = waitForManualVerificationIfNeeded(driver, trend);
+                if (!verificationCleared) {
+                    proxyManager.markBad(proxy);
+                    continue;
+                }
+
+                if (isLikelyBotCheckPage(driver)) {
+                    log.warn("Bot-check persisted after interaction for trend={} attempt={} proxy={}", trend, attempt, proxy);
+                    proxyManager.markBad(proxy);
+                    continue;
+                }
+
+                clickShowMoreIfPresent(driver);
+
+                new WebDriverWait(driver, Duration.ofSeconds(Math.max(8, timeoutSeconds)))
+                        .until(d -> !d.findElements(By.cssSelector("div.SoaBEf, div.dbsr, div.MjjYud, g-card, article, a.WlydOe")).isEmpty());
+
+                JavascriptExecutor js = (JavascriptExecutor) driver;
+                js.executeScript("window.scrollTo(0, document.body.scrollHeight * 0.75);");
+                Thread.sleep(1200);
+
+                String html = driver.getPageSource();
+                List<TrendNewsItem> newsItems = extractor.parseGoogleSearchNewsDocument(Jsoup.parse(html, searchUrl), trend, maxArticlesPerTrend);
+                if (!newsItems.isEmpty()) {
+                    log.info("Selenium Google Search news scrape returned {} items for trend={} on attempt {}", newsItems.size(), trend, attempt);
+                    return newsItems;
+                }
+
+                log.warn("Selenium Google Search news scrape attempt {} returned 0 items for trend={}", attempt, trend);
+            } catch (SessionNotCreatedException ex) {
+                log.warn("Selenium session could not be created for trend={} attempt={} proxy={}: {}", trend, attempt, proxy, ex.getMessage());
+                proxyManager.markBad(proxy);
+                break;
+            } catch (Exception ex) {
+                log.warn("Selenium Google Search news scrape attempt {} failed for trend={}: {}", attempt, trend, ex.getMessage());
+                proxyManager.markBad(proxy);
+            } finally {
+                quitDriver(driver);
+                cleanupProfileDir(driverSession);
+            }
+
+            randomSleep(1000, 3000);
+        }
+
+        log.warn("Selenium scraping failed after retries for trend={}. Falling back to Google News RSS.", trend);
+        return scrapeGoogleNewsViaRss(trend, searchUrl, maxArticlesPerTrend, extractor);
     }
 
     private boolean setupChromeDriverBinary() {
