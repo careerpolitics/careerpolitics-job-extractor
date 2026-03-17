@@ -9,17 +9,20 @@ import org.jsoup.nodes.Element;
 import org.jsoup.parser.Parser;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.MutableCapabilities;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.SessionNotCreatedException;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.interactions.Actions;
+import org.openqa.selenium.remote.RemoteWebDriver;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.net.URLEncoder;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
@@ -71,6 +74,9 @@ public class SeleniumTrendScraper {
     @Value("${careerpolitics.content.selenium.user-data-dir:profile}")
     private String seleniumUserDataDir;
 
+    @Value("${careerpolitics.content.selenium.remote-url:}")
+    private String seleniumRemoteUrl;
+
 
     public List<String> scrapeTrends(String trendsUrl, String geo, String language, int maxTrends, TrendArticleService extractor) {
         if (!seleniumEnabled) {
@@ -80,7 +86,7 @@ public class SeleniumTrendScraper {
         String url = trendsUrl + "?geo=" + extractor.urlEncodePublic(geo) + "&hl=" + extractor.urlEncodePublic(language)
                 + "&category=9&status=active";
 
-        WebDriverManager.chromedriver().setup();
+        setupLocalChromeDriverIfNeeded();
 
         int effectiveAttempts = seleniumHeadless ? Math.max(1, maxAttempts) : 1;
         for (int attempt = 1; attempt <= effectiveAttempts; attempt++) {
@@ -133,7 +139,7 @@ public class SeleniumTrendScraper {
             return List.of();
         }
 
-        WebDriverManager.chromedriver().setup();
+        setupLocalChromeDriverIfNeeded();
         ProxyManager proxyManager = new ProxyManager(parseProxyPool(proxyPool));
 
         int effectiveAttempts = seleniumHeadless ? Math.max(1, maxAttempts) : 1;
@@ -211,9 +217,27 @@ public class SeleniumTrendScraper {
     private DriverSession createStealthChromeDriver(String proxy, int attempt) throws Exception {
         Path profileDir = resolveProfileDir(attempt);
         ChromeOptions options = buildChromeOptions(proxy, profileDir);
-        ChromeDriver driver = new ChromeDriver(options);
-        applyStealthCdp(driver);
+        WebDriver driver = createWebDriver(options);
+        applyStealthCdpIfSupported(driver);
         return new DriverSession(driver, profileDir);
+    }
+
+    private WebDriver createWebDriver(MutableCapabilities options) throws Exception {
+        if (isRemoteSeleniumEnabled()) {
+            log.info("Creating remote selenium session with URL={}", seleniumRemoteUrl);
+            return new RemoteWebDriver(new URL(seleniumRemoteUrl), options);
+        }
+        return new ChromeDriver((ChromeOptions) options);
+    }
+
+    private void setupLocalChromeDriverIfNeeded() {
+        if (!isRemoteSeleniumEnabled()) {
+            WebDriverManager.chromedriver().setup();
+        }
+    }
+
+    private boolean isRemoteSeleniumEnabled() {
+        return seleniumRemoteUrl != null && !seleniumRemoteUrl.isBlank();
     }
 
     private ChromeOptions buildChromeOptions(String proxy, Path profileDir) {
@@ -227,7 +251,9 @@ public class SeleniumTrendScraper {
         options.addArguments("--disable-blink-features=AutomationControlled");
         options.addArguments("--lang=en-US,en;q=0.9");
         options.addArguments("--user-agent=" + REALISTIC_USER_AGENT);
-        options.addArguments("--user-data-dir=" + profileDir.toAbsolutePath());
+        if (profileDir != null) {
+            options.addArguments("--user-data-dir=" + profileDir.toAbsolutePath());
+        }
         options.setExperimentalOption("excludeSwitches", List.of("enable-automation"));
         options.setExperimentalOption("useAutomationExtension", false);
 
@@ -238,15 +264,19 @@ public class SeleniumTrendScraper {
         return options;
     }
 
-    private void applyStealthCdp(ChromeDriver driver) {
+    private void applyStealthCdpIfSupported(WebDriver driver) {
+        if (!(driver instanceof ChromeDriver chromeDriver)) {
+            return;
+        }
+
         try {
-            driver.executeCdpCommand("Page.addScriptToEvaluateOnNewDocument", java.util.Map.of(
+            chromeDriver.executeCdpCommand("Page.addScriptToEvaluateOnNewDocument", java.util.Map.of(
                     "source", "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
                             + "Object.defineProperty(navigator, 'platform', {get: () => 'Win32'});"
                             + "Object.defineProperty(navigator, 'language', {get: () => 'en-US'});"
                             + "Object.defineProperty(navigator, 'languages', {get: () => ['en-US','en']});"
             ));
-            driver.executeCdpCommand("Network.setUserAgentOverride", java.util.Map.of(
+            chromeDriver.executeCdpCommand("Network.setUserAgentOverride", java.util.Map.of(
                     "userAgent", REALISTIC_USER_AGENT,
                     "acceptLanguage", "en-US,en;q=0.9",
                     "platform", "Windows"
@@ -514,6 +544,10 @@ public class SeleniumTrendScraper {
     }
 
     private Path resolveProfileDir(int attempt) throws Exception {
+        if (isRemoteSeleniumEnabled()) {
+            return null;
+        }
+
         if (persistentProfileEnabled) {
             Path base = Path.of(seleniumUserDataDir).toAbsolutePath();
             Files.createDirectories(base);
@@ -543,7 +577,7 @@ public class SeleniumTrendScraper {
         }
     }
 
-    private record DriverSession(ChromeDriver driver, Path profileDir) {}
+    private record DriverSession(WebDriver driver, Path profileDir) {}
 
     private class ProxyManager {
         private final List<String> proxies;
