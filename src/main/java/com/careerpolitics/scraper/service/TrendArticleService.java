@@ -21,7 +21,6 @@ import java.net.URI;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -108,10 +107,10 @@ public class TrendArticleService {
     }
 
     public Map<String, Object> generateArticleData(String trend,
-                                                  List<TrendNewsItem> newsItems,
-                                                  List<TrendMediaItem> mediaItems,
-                                                  String coverImage,
-                                                  String language) {
+                                                   List<TrendNewsItem> newsItems,
+                                                   List<TrendMediaItem> mediaItems,
+                                                   String coverImage,
+                                                   String language) {
         return generateArticleWithClaudeViaOpenRouter(trend, newsItems, mediaItems, coverImage, language);
     }
 
@@ -405,45 +404,170 @@ public class TrendArticleService {
 
         String outputLanguage = resolveOutputLanguage(requestedLanguage);
         String prompt = String.format("""
-                Platform: CareerPolitics (government jobs, exams, results, current affairs)
-                Goal: Rank on Google and drive high traffic with high-quality, trustworthy content.
-
-                Task:
-                Create ONE reusable, topic-agnostic, SEO-optimized markdown article for trend: %s.
-                Article language: %s.
-
-                Writing requirements:
-                - Use clear, human, journalistic language (no fluff).
-                - Decide article structure dynamically from available facts.
-                - Include: what happened, why trending, timeline, official statements/reactions, and impact on aspirants/students/job seekers.
-                - Use proper headings/subheadings, short paragraphs, and bullet points.
-                - Include a concise FAQ section with 3-5 questions.
-                - Include "## Sources" with referenced links from provided data.
-                - Include "## Media" with relevant embeds/links from provided media candidates.
-                - If cover image exists, place it at the top in markdown image format.
-                - Keep claims factual and grounded in provided inputs. If information is missing, state uncertainty explicitly.
-
-                SEO requirements:
-                - Create a compelling, search-friendly title.
-                - Add high-intent keywords naturally in intro and subheadings.
-                - Return tags and keywords that are relevant to jobs/exams/current affairs audience.
-
-                Output format:
-                Return STRICT JSON only with keys:
-                - title (string)
-                - markdown (string)
-                - tags (array of strings)
-                - keywords (array of strings)
-
-                Cover image:
+                You are a senior investigative journalist and SEO strategist writing for CareerPolitics.com — a trusted platform for government job aspirants, exam updates, and policy developments.
+                
+                Your responsibility is to produce **original, insightful, and highly readable journalism**, not generic AI content.
+                
+                The article must feel **human-written, authoritative, and uniquely structured**, while remaining SEO optimized.
+                
+                ---
+                
+                OBJECTIVE
+                
+                Write a high-quality article about the trending topic:
+                
+                TREND: **%s**
+                
+                Language: **%s**
+                
+                The article should:
+                
+                • Rank on Google
+                • Provide real value to exam aspirants
+                • Increase reader engagement and dwell time
+                • Avoid generic or templated AI writing
+                
+                Use the provided news sources as factual input, but **synthesize information instead of rewriting them sequentially.**
+                
+                ---
+                
+                STEP 1 — Identify the News Angle
+                
+                Before writing, determine the **primary angle** of the story:
+                
+                Choose one dominant perspective:
+                
+                • Policy or government decision impact  
+                • Exam notification or recruitment update  
+                • Timeline change affecting aspirants  
+                • Public reaction or controversy  
+                • Opportunity or warning for job seekers  
+                
+                Ensure the article consistently reflects this angle.
+                
+                ---
+                
+                STEP 2 — Originality Rules
+                
+                To maintain originality and reduce AI-like patterns:
+                
+                • Do NOT copy the structure of the sources  
+                • Do NOT summarize each source separately  
+                • Combine insights across sources  
+                • Use varied sentence structure and natural transitions  
+                • Avoid repetitive AI phrases such as  
+                  "In today's world", "It is important to note", etc.
+                
+                The final article should read like **a single cohesive story**.
+                
+                ---
+                
+                STEP 3 — Rich Forem Content
+                
+                Use Forem platform features when relevant.
+                
+                URL Embeds  
+                If a media item is a tweet, YouTube video, etc., include the raw URL on its own line.
+                
+                CTA Example:
+                
+                {%% cta https://example.com %%}
+                Join our Telegram channel for instant government job alerts
+                {%% endcta %%}
+                
+                Collapsible Sections:
+                
+                {%% details What is the new exam date? %%}
+                Content
+                {%% enddetails %%}
+                
+                Use tables where comparisons are helpful.
+                
+                Use KaTeX only if mathematical content is involved.
+                
+                ---
+                
+                ARTICLE STRUCTURE
+                
+                Adapt naturally, but generally include:
+                
+                1. Cover Image (if provided)
+                2. SEO Optimized Title
+                3. Introduction — explain what happened and why aspirants care
+                4. Key Developments
+                5. Why This Topic Is Trending
+                6. Timeline of Events (if relevant)
+                7. Impact on Aspirants
+                8. Official Statements or Reactions
+                9. Expert Insights (if available)
+                10. FAQ Section (collapsible)
+                11. Conclusion with actionable advice
+                12. Sources
+                13. Media Embeds
+                
+                ---
+                
+                WRITING STYLE
+                
+                Tone:
+                Professional journalism — clear, authoritative, helpful.
+                
+                Formatting:
+                
+                • Short paragraphs
+                • Clear subheadings
+                • Bullet points for readability
+                • Bold important terms
+                
+                Accuracy Rules:
+                
+                • Base claims only on provided sources
+                • If information is unclear say:
+                  "As of now, no official confirmation is available."
+                
+                Avoid speculation unless labeled clearly.
+                
+                ---
+                
+                SEO OPTIMIZATION
+                
+                • Identify the most likely search query users would type.
+                • Ensure the title answers that query.
+                • Use natural keyword variations.
+                • Avoid keyword stuffing.
+                
+                Target readers:
+                
+                UPSC, SSC, Banking, Railways, State PSC aspirants.
+                
+                ---
+                
+                PROVIDED DATA
+                
+                Cover Image URL:
                 %s
-
-                News sources:
+                
+                News Sources:
                 %s
-
-                Media candidates:
+                
+                Media Candidates:
                 %s
-                """, trend, outputLanguage, (coverImage == null ? "" : coverImage), sourcesText, mediaText);
+                
+                ---
+                
+                OUTPUT FORMAT
+                
+                Return ONLY valid JSON.
+                
+                {
+                "title": "SEO optimized headline",
+                "markdown": "Full article in markdown and Forem liquid format",
+                "tags": ["max 8 tags"],
+                "keywords": ["max 10 SEO keywords"]
+                }
+                
+                Do not include explanations or text outside the JSON.
+                """, trend, outputLanguage, coverImage, sourcesText, mediaText);
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", openRouterModel);
@@ -682,7 +806,8 @@ public class TrendArticleService {
         return link;
     }
 
-    public record TrendMediaBundle(List<TrendMediaItem> items, String coverImage) {}
+    public record TrendMediaBundle(List<TrendMediaItem> items, String coverImage) {
+    }
 
     Map<String, String> parseQueryParams(String rawQuery) {
         Map<String, String> params = new LinkedHashMap<>();
@@ -853,6 +978,7 @@ public class TrendArticleService {
         }
         return out.toString();
     }
+
     private String urlDecode(String value) {
         return URLDecoder.decode(value, StandardCharsets.UTF_8);
     }
