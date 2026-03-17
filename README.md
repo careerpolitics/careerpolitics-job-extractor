@@ -1,149 +1,74 @@
-# CareerPolitics Job Scraper
+# Jib Deployment Guide (No Dockerfile)
 
-A Spring Boot service to discover job URLs, scrape detailed job information, and manage/export results. Includes OpenAPI/Swagger UI, H2 in-memory DB for local dev, and Docker support.
+## Why Jib
+Jib builds OCI images directly from Gradle without writing or maintaining a Dockerfile.
 
-## Features
-- URL discovery (e.g., sarkariexam)
-- Detail scraping with basic parsing
-- Data management (paging, filters, markdown generation)
-- Orchestration (full cycle run, simple schedules, metrics)
-- OpenAPI docs (Swagger UI)
-
-## Tech Stack
-- Java 17, Spring Boot 3
-- Spring Web, Data JPA, Validation, Caching, Actuator
-- H2 (local dev), PostgreSQL (runtime option)
-- Jsoup, imgscalr, springdoc-openapi
-
-## Quickstart
-
-### Prerequisites
-- Java 17+
-- Bash
-
-### Run locally
+## 1) Configure runtime env file
 ```bash
-./gradlew bootRun
+cp .env.example .env
 ```
-App runs at `http://localhost:8080` with API routes under `/api`.
 
-- Health: `http://localhost:8080/actuator/health`
-- Swagger UI: `http://localhost:8080/swagger-ui/index.html`
-- OpenAPI JSON: `http://localhost:8080/v3/api-docs`
-- OpenAPI YAML: `http://localhost:8080/v3/api-docs.yaml`
+Edit `.env` with production values.
 
-H2 console: `http://localhost:8080/h2-console` (JDBC URL: `jdbc:h2:mem:careerpoliticsdb`)
-
-### Build JAR
+## 2) Build locally
 ```bash
-./gradlew clean build -x test
+IMAGE_NAME=yourdockerhub/careerpolitics-scraper IMAGE_TAG=1.0.0 ./scripts/build.sh
 ```
-Artifact: `build/libs/careerpolitics-job-scraper.jar`
 
-### Docker (via Jib)
+## 3) Run locally
 ```bash
-./gradlew jibDockerBuild
+IMAGE_NAME=yourdockerhub/careerpolitics-scraper IMAGE_TAG=1.0.0 ENV_FILE=.env ./scripts/run.sh
 ```
-Image: `careerpolitics/scraper:latest`
 
-Run container:
+Health:
 ```bash
-docker run --rm -p 8080:8080 careerpolitics/scraper:latest
+curl -fsS http://localhost:8080/actuator/health
 ```
 
-## Export OpenAPI spec
-Export JSON:
+Logs:
 ```bash
-curl -s http://localhost:8080/v3/api-docs > openapi.json
+docker logs -f careerpolitics-scraper-local
 ```
-Export YAML:
+
+## 4) Push to registry
 ```bash
-curl -s http://localhost:8080/v3/api-docs.yaml > openapi.yaml
+docker login
+IMAGE_NAME=yourdockerhub/careerpolitics-scraper IMAGE_TAG=1.0.0 ./scripts/push.sh
 ```
-Or use the helper script after starting the app:
+
+## 5) Deploy on DigitalOcean Droplet
+Install Docker:
 ```bash
-bash scripts/export-openapi.sh
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+newgrp docker
 ```
 
-## Key Endpoints (base `/api`)
-- URL Collection: `/careerpolitics/url-collection/*`
-- Detail Scraping: `/careerpolitics/detail-scraping/*`
-- Data Management: `/careerpolitics/data/*`
-- Orchestration: `/careerpolitics/orchestration/*`
-- Config: `/careerpolitics/config/*`
-
-## Configuration
-See `src/main/resources/application.yaml`.
-
-Optional env vars:
-- `AWS_REGION` (default `us-east-1`) for S3Client
-
-## Notes
-- Defaults seed in `data.sql` for H2
-- For production, configure PostgreSQL datasource and Spring profiles
-## Trending Jobs/Education Article Generation
-
-A new endpoint discovers Google Trends topics in India (jobs/education), researches each trend via Google Trends (Selenium/page scrape) and Google Search news results from multiple sources, enriches context with media (photos/videos from source links + YouTube/social links), auto-selects a cover image when available, and generates a detailed Claude via OpenRouter markdown article for **each** trend topic. For each generated article, the API request to CareerPolitics article API is sent with `published` flag based on request (`true`/`false`, default `false`).
-
-### Endpoint
-`POST /api/careerpolitics/content/trends/article`
-
-`GET /api/careerpolitics/content/news/rss/resolve-first?query=ssc&hl=en-US&gl=US&ceid=US:en`
-
-All APIs are documented in Swagger/OpenAPI (including these endpoints):
-- Swagger UI: `/swagger-ui/index.html`
-- OpenAPI JSON: `/v3/api-docs`
-
-Example request:
-```json
-{
-  "geo": "IN",
-  "language": "en-US", // set hi-IN, bn-IN, ta-IN, etc. to generate in that language
-  "maxTrends": 5,
-  "maxNewsPerTrend": 3,
-  "trendCooldownHours": 24,
-  "publish": false,
-  "fallbackTrends": ["UPSC", "NEET", "Campus Placements"]
-}
-```
-
-### Required environment variables
-- `OPENROUTER_API_KEY` for Claude via OpenRouter article generation
-- `CAREERPOLITICS_ARTICLE_API_URL` for article publishing endpoint
-- `CAREERPOLITICS_ARTICLE_API_TOKEN` optional auth token sent as `api-key`
-- Optional: `SELENIUM_ENABLED` (default `true`) to enable Selenium scraping
-- Optional: `SELENIUM_NEWS_ENABLED` (default `true`) to enable Selenium-based Google Search news scraping
-- Optional: `SELENIUM_HEADLESS` (default `false`) to open browser window for debugging when Selenium runs
-- Optional: `SELENIUM_TIMEOUT_SECONDS` (default `20`) for Selenium wait timeout
-- Optional: `TRENDS_SCHEDULER_ENABLED` (default `false`) to run automatic hourly `/trends/article` pipeline
-- Optional: `TRENDS_SCHEDULER_CRON` (default `0 0 * * * *`) for schedule control (hourly by default)
-- Optional: `TRENDS_SCHEDULER_TREND_COOLDOWN_HOURS` (default `24`) to reduce repeating the same trend
-- Optional: `SELENIUM_MANUAL_VERIFICATION_WAIT_ENABLED` (default `true`) waits when Google bot-check appears so you can manually verify in browser.
-- Optional: `SELENIUM_MANUAL_VERIFICATION_MAX_WAIT_SECONDS` (default `180`) maximum wait for manual verification completion.
-- `language` request field also controls article output language (for example: `en-US`, `hi-IN`, `ta-IN`).
-- Optional: `careerpolitics.content.youtube-rss-url` for YouTube media discovery
-
-
-### Automatic hourly run (extract + post article)
-When `TRENDS_SCHEDULER_ENABLED=true`, the service triggers the same trend article pipeline every hour (cron default `0 0 * * * *`). It generates and publishes posts automatically and applies trend cooldown filtering so recently used trend slugs are deprioritized for the next runs.
-
-### Notes
-- Error responses: API returns structured error JSON for workflow failures (e.g., no trends found, no news found for all trends).
-- If `fallbackTrends` is provided, those values are used with higher priority than live trend scraping.
-- API sends article payload to CareerPolitics endpoint with `article.published` set from `publish` (`false` by default when omitted).
-- Google Search/Google News wrapped links are resolved to original publisher URLs before snippet/media extraction.
-
-
-## DigitalOcean App Platform Deployment
-
-- App spec file: `.do/app.yaml`
-- Step-by-step guide: `docs/digitalocean-app-platform.md`
-
-Quick deploy with CLI:
+Create env file:
 ```bash
-doctl apps create --spec .do/app.yaml
+mkdir -p ~/careerpolitics
+nano ~/careerpolitics/.env
 ```
 
+Pull and run:
+```bash
+docker pull yourdockerhub/careerpolitics-scraper:1.0.0
 
-### App Platform Docker build note
-The Dockerfile builds the JAR inside a multi-stage build, so App Platform does not require a prebuilt `build/libs/*.jar` artifact in the repo context.
+docker rm -f careerpolitics-scraper || true
+
+docker run -d \
+  --name careerpolitics-scraper \
+  --restart unless-stopped \
+  --env-file ~/careerpolitics/.env \
+  -p 8080:8080 \
+  yourdockerhub/careerpolitics-scraper:1.0.0
+```
+
+Verify:
+```bash
+docker ps
+curl -fsS http://localhost:8080/actuator/health
+```
+
+## Selenium + Chrome compatibility note
+Jib cannot run `apt-get` during build like a Dockerfile. For Selenium support, this project uses a Debian-based base image (`selenium/standalone-chrome`) that already includes Google Chrome and required system libraries.

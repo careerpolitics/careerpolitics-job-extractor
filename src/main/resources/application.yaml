@@ -63,7 +63,7 @@ careerpolitics:
         model: anthropic/claude-3.5-sonnet
         api-key: ${OPENROUTER_API_KEY:}
     article-api:
-      url: ${CAREERPOLITICS_ARTICLE_API_URL:}
+      url: ${CAREERPOLITICS_ARTICLE_API_URL:https://careerpolitics.com/api/articles}
       token: ${CAREERPOLITICS_ARTICLE_API_TOKEN:}
     trends:
       scheduler:
