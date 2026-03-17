@@ -53,6 +53,7 @@ careerpolitics:
       proxy-pool: ${SELENIUM_PROXY_POOL:}
       persistent-profile-enabled: ${SELENIUM_PERSISTENT_PROFILE_ENABLED:false}
       user-data-dir: ${SELENIUM_USER_DATA_DIR:profile}
+      remote-url: ${SELENIUM_REMOTE_URL:}
     ai:
       openrouter:
         base-url: https://openrouter.ai/api/v1

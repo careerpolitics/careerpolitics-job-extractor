@@ -6,6 +6,8 @@ services:
       - "8080:8080"
     env_file:
       - .env
+    environment:
+      SELENIUM_REMOTE_URL: ${SELENIUM_REMOTE_URL:-http://selenium:4444/wd/hub}
     depends_on:
       - selenium
 
