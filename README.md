@@ -134,16 +134,16 @@ When `TRENDS_SCHEDULER_ENABLED=true`, the service triggers the same trend articl
 - Google Search/Google News wrapped links are resolved to original publisher URLs before snippet/media extraction.
 
 
-## DigitalOcean App Platform Deployment
+## DigitalOcean Droplet Deployment
 
-- App spec file: `.do/app.yaml`
-- Step-by-step guide: `docs/digitalocean-app-platform.md`
+- Compose file: `docker-compose.droplet.yml`
+- Environment template: `.env.droplet.example`
+- Step-by-step guide: `docs/digitalocean-droplet.md`
 
-Quick deploy with CLI:
+Quick deploy on Droplet:
 ```bash
-doctl apps create --spec .do/app.yaml
+cp .env.droplet.example .env.droplet
+# edit .env.droplet with production values
+
+docker compose -f docker-compose.droplet.yml up -d --build
 ```
-
-
-### App Platform Docker build note
-The Dockerfile builds the JAR inside a multi-stage build, so App Platform does not require a prebuilt `build/libs/*.jar` artifact in the repo context.
