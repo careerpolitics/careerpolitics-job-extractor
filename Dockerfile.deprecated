@@ -1,2 +1,0 @@
-# Deprecated: image builds are now done with Google Jib.
-# Use ./gradlew jibDockerBuild or scripts/build.sh.

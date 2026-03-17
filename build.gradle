@@ -71,11 +71,11 @@ tasks.named('bootJar') {
 
 jib {
     from {
-        image = 'selenium/standalone-chrome:126.0'
+        image = "selenium/standalone-chrome:latest"
     }
     to {
-        image = System.getenv('IMAGE_NAME') ?: "careerpolitics/scraper"
-        tags = [System.getenv('IMAGE_TAG') ?: project.version.toString(), 'latest'] as Set
+        image = System.getenv('IMAGE_NAME') ?: "muraridevv/careerpolitics-job-scraper"
+        tags = [System.getenv('IMAGE_TAG') ?: project.version.toString()] as Set
     }
     container {
         mainClass = 'com.careerpolitics.scraper.CareerPoliticsScraperApplication'
