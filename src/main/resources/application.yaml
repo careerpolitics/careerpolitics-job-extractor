@@ -7,6 +7,9 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
     password: ${SPRING_DATASOURCE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 3
+      minimum-idle: 1
 
   jpa:
     hibernate:
@@ -27,9 +30,6 @@ spring:
 
 # CareerPolitics Configuration
 careerpolitics:
-  web:
-    cors:
-      allowed-origin-patterns: ${WEB_CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:3000,https://careerpolitics.com,*}
   scraper:
     base-url: https://www.sarkariexam.com
     batch-size: 5
@@ -52,7 +52,7 @@ careerpolitics:
       manual-verification-wait-enabled: ${SELENIUM_MANUAL_VERIFICATION_WAIT_ENABLED:true}
       manual-verification-max-wait-seconds: ${SELENIUM_MANUAL_VERIFICATION_MAX_WAIT_SECONDS:180}
       timeout-seconds: ${SELENIUM_TIMEOUT_SECONDS:20}
-      max-attempts: ${SELENIUM_MAX_ATTEMPTS:5}
+      max-attempts: ${SELENIUM_MAX_ATTEMPTS:2}
       proxy-pool: ${SELENIUM_PROXY_POOL:}
       remote-url: ${SELENIUM_REMOTE_URL:http://selenium:4444/wd/hub}
     ai:
@@ -71,7 +71,7 @@ careerpolitics:
         language: ${TRENDS_SCHEDULER_LANGUAGE:en-US}
         max-trends: ${TRENDS_SCHEDULER_MAX_TRENDS:3}
         max-news-per-trend: ${TRENDS_SCHEDULER_MAX_NEWS_PER_TREND:3}
-        trend-cooldown-hours: ${TRENDS_SCHEDULER_TREND_COOLDOWN_HOURS:168}
+        trend-cooldown-hours: ${TRENDS_SCHEDULER_TREND_COOLDOWN_HOURS:48}
         publish: ${TRENDS_SCHEDULER_PUBLISH:true}
         fallback-trends: ${TRENDS_SCHEDULER_FALLBACK_TRENDS:}
 

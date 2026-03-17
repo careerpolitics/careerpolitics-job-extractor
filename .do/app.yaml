@@ -56,7 +56,7 @@ services:
         value: "true"
       - key: TRENDS_SCHEDULER_TREND_COOLDOWN_HOURS
         scope: RUN_TIME
-        value: "24"
+        value: "48"
       - key: SELENIUM_TIMEOUT_SECONDS
         scope: RUN_TIME
         value: "25"
