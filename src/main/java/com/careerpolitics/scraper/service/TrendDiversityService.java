@@ -7,13 +7,10 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 
 @Slf4j
@@ -26,9 +23,6 @@ public class TrendDiversityService {
         this.trendArticleHistoryRepository = trendArticleHistoryRepository;
     }
 
-    TrendDiversityService() {
-        this.trendArticleHistoryRepository = null;
-    }
 
     List<String> selectNonRepeatingTrends(List<String> trends, int maxTrends, int cooldownHours) {
         if (trends == null || trends.isEmpty()) {
@@ -45,44 +39,28 @@ public class TrendDiversityService {
         }
 
         List<String> orderedUnique = new ArrayList<>(uniqueBySlug.values());
-        if (trendArticleHistoryRepository == null || cooldownHours <= 0) {
+        if (cooldownHours <= 0) {
             return orderedUnique.stream().limit(Math.max(1, maxTrends)).toList();
         }
 
         LocalDateTime cutoff = LocalDateTime.now().minusHours(cooldownHours);
         Set<String> recentlyUsed = new HashSet<>(trendArticleHistoryRepository.findTrendSlugsUsedSince(cutoff));
-        Map<String, LocalDateTime> latestUseBySlug = new HashMap<>();
-        for (Object[] row : trendArticleHistoryRepository.findLatestGeneratedAtByTrendSlug()) {
-            if (row.length >= 2 && row[0] != null && row[1] instanceof LocalDateTime time) {
-                latestUseBySlug.put(String.valueOf(row[0]), time);
-            }
+
+        List<String> fresh = orderedUnique.stream()
+                .filter(trend -> !recentlyUsed.contains(slug(trend)))
+                .limit(Math.max(1, maxTrends))
+                .toList();
+
+        int skipped = orderedUnique.size() - fresh.size();
+        if (skipped > 0) {
+            log.info("Skipped {} recently processed trends inside cooldown window ({} hours)", skipped, cooldownHours);
         }
 
-        List<String> fresh = new ArrayList<>();
-        List<String> stale = new ArrayList<>();
-        for (String trend : orderedUnique) {
-            if (recentlyUsed.contains(slug(trend))) {
-                stale.add(trend);
-            } else {
-                fresh.add(trend);
-            }
-        }
-
-        stale.sort(Comparator.comparing(t -> latestUseBySlug.getOrDefault(slug(t), LocalDateTime.MIN)));
-
-        List<String> selected = new ArrayList<>(fresh);
-        for (String trend : stale) {
-            if (selected.size() >= maxTrends) {
-                break;
-            }
-            selected.add(trend);
-        }
-
-        return selected.stream().limit(Math.max(1, maxTrends)).toList();
+        return fresh;
     }
 
     void recordTrendHistory(String trend, boolean published) {
-        if (trendArticleHistoryRepository == null || trend == null || trend.isBlank()) {
+        if (trend == null || trend.isBlank()) {
             return;
         }
 

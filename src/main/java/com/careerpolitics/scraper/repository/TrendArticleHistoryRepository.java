@@ -15,6 +15,4 @@ public interface TrendArticleHistoryRepository extends JpaRepository<TrendArticl
     @Query("select h.trendSlug from TrendArticleHistory h where h.generatedAt >= :cutoff")
     List<String> findTrendSlugsUsedSince(@Param("cutoff") LocalDateTime cutoff);
 
-    @Query("select h.trendSlug, max(h.generatedAt) from TrendArticleHistory h group by h.trendSlug")
-    List<Object[]> findLatestGeneratedAtByTrendSlug();
 }

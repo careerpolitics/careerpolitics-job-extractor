@@ -29,9 +29,9 @@ public class TrendArticleRequest {
 
 
     @Min(1)
-    @Max(168)
-    @Schema(description = "Do not repeat same trend within this cooldown window (hours)", example = "24", minimum = "1", maximum = "168", defaultValue = "24")
-    private int trendCooldownHours = 24;
+    @Max(720)
+    @Schema(description = "Do not repeat same trend within this cooldown window (hours)", example = "24", minimum = "1", maximum = "720", defaultValue = "48")
+    private int trendCooldownHours = 48;
 
     @Schema(description = "Whether article should be published at CareerPolitics article API", example = "false", defaultValue = "false")
     private Boolean publish = false;

@@ -34,7 +34,7 @@ public class TrendArticleSchedulerService {
     @Value("${careerpolitics.content.trends.scheduler.publish:true}")
     private boolean publish;
 
-    @Value("${careerpolitics.content.trends.scheduler.trend-cooldown-hours:24}")
+    @Value("${careerpolitics.content.trends.scheduler.trend-cooldown-hours:48}")
     private int trendCooldownHours;
 
     @Value("${careerpolitics.content.trends.scheduler.fallback-trends:}")
@@ -58,16 +58,7 @@ public class TrendArticleSchedulerService {
         }
 
         try {
-            TrendArticleRequest request = new TrendArticleRequest();
-            request.setGeo(geo);
-            request.setLanguage(language);
-            request.setMaxTrends(Math.max(1, maxTrends));
-            request.setMaxNewsPerTrend(Math.max(1, maxNewsPerTrend));
-            request.setPublish(publish);
-            request.setTrendCooldownHours(Math.max(1, trendCooldownHours));
-            request.setFallbackTrends(
-                    fallbackTrends == null || fallbackTrends.isEmpty() ? null : fallbackTrends
-            );
+            TrendArticleRequest request = getTrendArticleRequest();
 
             var response = trendArticleWorkflowService.createAndOptionallyPublish(request);
             log.info(
@@ -80,5 +71,19 @@ public class TrendArticleSchedulerService {
         } finally {
             running.set(false);
         }
+    }
+
+    private TrendArticleRequest getTrendArticleRequest() {
+        TrendArticleRequest request = new TrendArticleRequest();
+        request.setGeo(geo);
+        request.setLanguage(language);
+        request.setMaxTrends(Math.max(1, maxTrends));
+        request.setMaxNewsPerTrend(Math.max(1, maxNewsPerTrend));
+        request.setPublish(publish);
+        request.setTrendCooldownHours(Math.max(1, trendCooldownHours));
+        request.setFallbackTrends(
+                fallbackTrends == null || fallbackTrends.isEmpty() ? null : fallbackTrends
+        );
+        return request;
     }
 }
