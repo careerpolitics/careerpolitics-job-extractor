@@ -27,6 +27,9 @@ spring:
 
 # CareerPolitics Configuration
 careerpolitics:
+  web:
+    cors:
+      allowed-origin-patterns: ${WEB_CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:3000,https://careerpolitics.com,*}
   scraper:
     base-url: https://www.sarkariexam.com
     batch-size: 5
