@@ -23,9 +23,6 @@ public class TrendDiversityService {
         this.trendArticleHistoryRepository = trendArticleHistoryRepository;
     }
 
-    TrendDiversityService() {
-        this.trendArticleHistoryRepository = null;
-    }
 
     List<String> selectNonRepeatingTrends(List<String> trends, int maxTrends, int cooldownHours) {
         if (trends == null || trends.isEmpty()) {
@@ -42,7 +39,7 @@ public class TrendDiversityService {
         }
 
         List<String> orderedUnique = new ArrayList<>(uniqueBySlug.values());
-        if (trendArticleHistoryRepository == null || cooldownHours <= 0) {
+        if (cooldownHours <= 0) {
             return orderedUnique.stream().limit(Math.max(1, maxTrends)).toList();
         }
 
@@ -63,7 +60,7 @@ public class TrendDiversityService {
     }
 
     void recordTrendHistory(String trend, boolean published) {
-        if (trendArticleHistoryRepository == null || trend == null || trend.isBlank()) {
+        if (trend == null || trend.isBlank()) {
             return;
         }
 
