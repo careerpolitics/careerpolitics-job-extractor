@@ -16,14 +16,11 @@ import java.util.List;
 
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
-    @Value("${careerpolitics.web.cors.allowed-origin-patterns:http://localhost:3000,https://careerpolitics.com,*}")
-    private List<String> corsAllowedOriginPatterns;
-
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**")
-                .allowedOrigins("*")
+                .allowedOriginPatterns("*")   // ✅ FIX
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true);
