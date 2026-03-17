@@ -2,11 +2,9 @@
 set -euo pipefail
 
 IMAGE_NAME="${IMAGE_NAME:-careerpolitics/scraper}"
-VERSION="${VERSION:-$(date +%Y.%m.%d)-$(git rev-parse --short HEAD)}"
+IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
 
-printf 'Building image %s with tags [%s, latest]\n' "$IMAGE_NAME" "$VERSION"
-docker build -t "${IMAGE_NAME}:${VERSION}" -t "${IMAGE_NAME}:latest" .
+echo "Building local Docker image with Jib: ${IMAGE_NAME}:${IMAGE_TAG}"
+IMAGE_NAME="$IMAGE_NAME" IMAGE_TAG="$IMAGE_TAG" ./gradlew jibDockerBuild
 
-printf 'Build complete.\n'
-printf '  %s\n' "${IMAGE_NAME}:${VERSION}"
-printf '  %s\n' "${IMAGE_NAME}:latest"
+echo "Built tags: ${IMAGE_NAME}:${IMAGE_TAG}, ${IMAGE_NAME}:latest"

@@ -1,71 +1,56 @@
-# Docker Deployment Guide (Local build -> Registry -> DigitalOcean)
+# Jib Deployment Guide (No Dockerfile)
 
-## 1) Final Dockerfile
-Use the repository `Dockerfile` (Debian/Ubuntu Java runtime, Google Chrome, Selenium-ready, healthcheck).
+## Why Jib
+Jib builds OCI images directly from Gradle without writing or maintaining a Dockerfile.
 
-## 2) Sample `.env`
+## 1) Configure runtime env file
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` and set real secrets (never commit `.env`).
+Edit `.env` with production values.
 
-## 3) Local build and test
-Build image locally (tags: `VERSION` and `latest`):
+## 2) Build locally
 ```bash
-IMAGE_NAME=yourdockerhub/careerpolitics-scraper VERSION=1.0.0 ./scripts/build.sh
+IMAGE_NAME=yourdockerhub/careerpolitics-scraper IMAGE_TAG=1.0.0 ./scripts/build.sh
 ```
 
-Run locally with env file:
+## 3) Run locally
 ```bash
-docker run --rm --name careerpolitics-local \
-  --env-file .env \
-  -p 8080:8080 \
-  yourdockerhub/careerpolitics-scraper:1.0.0
+IMAGE_NAME=yourdockerhub/careerpolitics-scraper IMAGE_TAG=1.0.0 ENV_FILE=.env ./scripts/run.sh
 ```
 
-Verify health:
+Health:
 ```bash
 curl -fsS http://localhost:8080/actuator/health
 ```
 
-Read logs:
+Logs:
 ```bash
-docker logs -f careerpolitics-local
+docker logs -f careerpolitics-scraper-local
 ```
 
-## 4) Push image to Docker Hub
-Login:
+## 4) Push to registry
 ```bash
 docker login
-```
-
-Push both tags:
-```bash
-IMAGE_NAME=yourdockerhub/careerpolitics-scraper VERSION=1.0.0 ./scripts/push.sh
-```
-
-Equivalent manual commands:
-```bash
-docker push yourdockerhub/careerpolitics-scraper:1.0.0
-docker push yourdockerhub/careerpolitics-scraper:latest
+IMAGE_NAME=yourdockerhub/careerpolitics-scraper IMAGE_TAG=1.0.0 ./scripts/push.sh
 ```
 
 ## 5) Deploy on DigitalOcean Droplet
-### Install Docker (once)
+Install Docker:
 ```bash
 curl -fsSL https://get.docker.com | sh
 sudo usermod -aG docker $USER
 newgrp docker
 ```
 
-### Prepare env file
+Create env file:
 ```bash
-mkdir -p ~/careerpolitics && cd ~/careerpolitics
-nano .env
+mkdir -p ~/careerpolitics
+nano ~/careerpolitics/.env
 ```
 
-### Pull and run container
+Pull and run:
 ```bash
 docker pull yourdockerhub/careerpolitics-scraper:1.0.0
 
@@ -79,30 +64,11 @@ docker run -d \
   yourdockerhub/careerpolitics-scraper:1.0.0
 ```
 
-### Verify deployment
+Verify:
 ```bash
 docker ps
 curl -fsS http://localhost:8080/actuator/health
 ```
 
-## 6) Automation scripts
-- `scripts/build.sh`: local build + tag (`VERSION`, `latest`)
-- `scripts/push.sh`: push `VERSION` and `latest`
-- `scripts/deploy.sh`: pull + recreate container with restart policy
-
-Server usage example:
-```bash
-IMAGE_NAME=yourdockerhub/careerpolitics-scraper VERSION=1.0.0 ENV_FILE=~/careerpolitics/.env APP_PORT=8080 ./scripts/deploy.sh
-```
-
-## 7) Optional docker-compose
-```bash
-cp .env.example .env
-IMAGE_NAME=yourdockerhub/careerpolitics-scraper VERSION=1.0.0 docker compose up -d
-```
-
-## 8) Troubleshooting
-- Check logs: `docker logs -f careerpolitics-scraper`
-- Check health: `docker inspect --format='{{json .State.Health}}' careerpolitics-scraper | jq`
-- Port conflict: use `-p 8081:8080`
-- Missing env vars: inspect `.env` and app startup logs
+## Selenium + Chrome compatibility note
+Jib cannot run `apt-get` during build like a Dockerfile. For Selenium support, this project uses a Debian-based base image (`selenium/standalone-chrome`) that already includes Google Chrome and required system libraries.
