@@ -1,230 +1,334 @@
-# CareerPolitics Job Scraper – Deployment Guide
+# 🚀 CareerPolitics Job Scraper – Deployment & Domain Setup Guide
 
-This document provides instructions to build the Docker image for the CareerPolitics Job Scraper and deploy it on a DigitalOcean droplet.
+This guide covers:
 
----
-
-## 📦 Prerequisites
-
-- **Local machine**:
-    - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (with Docker Compose)
-    - [Git](https://git-scm.com/) (optional)
-    - Java 17+ and Gradle (if you need to rebuild the application)
-    - A [Docker Hub](https://hub.docker.com/) account (or any container registry)
-
-- **DigitalOcean**:
-    - An active DigitalOcean account
-    - SSH key pair (for droplet access)
+* Building & pushing Docker image (via Jib)
+* Deploying on a DigitalOcean droplet
+* Running with Docker Compose
+* Exposing via custom domain + HTTPS
 
 ---
 
-## 🏗️ Build and Push the Application Image
+# 📦 Prerequisites
 
-The application image is built using **Jib** (Google’s container build tool for Java). Jib integrates with Gradle and does not require a Docker daemon on your build machine.
+### Local Machine
 
-### 1. Clone the repository (if not already done)
+* Docker Desktop (with Compose)
+* Java 17+
+* Gradle
+* Docker Hub account
+
+### Server (DigitalOcean)
+
+* Ubuntu 22.04+
+* SSH access
+
+---
+
+# 🏗️ Build & Push Docker Image
+
+### 1. Clone repo
 
 ```bash
 git clone https://github.com/careerpolitics/careerpolitics-job-extractor.git
 cd careerpolitics-job-extractor
 ```
 
-### 2. Build the image and push to Docker Hub
-
-Make sure you are logged in to Docker Hub:
+### 2. Login to Docker
 
 ```bash
 docker login
 ```
 
-Then run the Gradle Jib task:
+### 3. Build & Push (Jib)
 
 ```bash
 ./gradlew jib
 ```
 
-This will:
-- Build the application image using the base image `selenium/standalone-chrome:latest`
-- Push the image to Docker Hub under the repository `muraridevv/careerpolitics-job-scraper` (or the one defined in your Jib configuration).
+👉 Image pushed to:
 
-> **Note**: The image tag is taken from `project.version` (e.g., `1.0-SNAPSHOT`). You can override it by setting environment variables `IMAGE_NAME` and `IMAGE_TAG`.
-
-After a successful push, your image is available at:  
-`docker.io/muraridevv/careerpolitics-job-scraper:1.0-SNAPSHOT`
+```
+muraridevv/careerpolitics-job-scraper:<tag>
+```
 
 ---
 
-## ☁️ Deploy on DigitalOcean Droplet
+# ☁️ Deploy on DigitalOcean
 
-### 1. Create a Droplet
+## 1. Create Droplet
 
-- Log in to your DigitalOcean control panel.
-- Click **Create → Droplet**.
-- Choose an **Ubuntu 22.04 LTS** image (or later).
-- Select a plan (e.g., Basic, $6/month with 1 GB RAM – adjust based on your needs).
-- Add your **SSH key** for secure access.
-- Give your droplet a hostname (e.g., `careerpolitics-scraper`).
-- Click **Create Droplet**.
+* Ubuntu 22.04
+* Add SSH key
+* Note IP (e.g., `139.59.62.214`)
 
-Once created, note the droplet’s **IPv4 address**.
+---
 
-### 2. SSH into the Droplet
+## 2. SSH into server
 
 ```bash
-ssh root@<your-droplet-ip>
+ssh root@<your-ip>
 ```
 
-### 3. Install Docker and Docker Compose
+---
 
-Run the following commands on the droplet:
+## 3. Install Docker
 
 ```bash
-# Update package list
-apt update
-
-# Install prerequisites
-apt install -y apt-transport-https ca-certificates curl software-properties-common
-
-# Add Docker's official GPG key and repository
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-# Install Docker
 apt update
 apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+```
 
-# Verify installations
+Verify:
+
+```bash
 docker --version
 docker compose version
 ```
 
-### 4. Prepare the Deployment Directory
+---
 
-Create a directory for the project and navigate into it:
+## 4. Setup Project Directory
 
 ```bash
 mkdir /opt/careerpolitics
 cd /opt/careerpolitics
 ```
 
-### 5. Copy Configuration Files
+---
 
-You need the `docker-compose.yaml` and `.env` files on the droplet.  
-Use `scp` from your local machine to transfer them:
+## 5. Copy Files
+
+From local machine:
 
 ```bash
-scp docker-compose.yaml root@<your-droplet-ip>:/opt/careerpolitics/
-scp .env root@<your-droplet-ip>:/opt/careerpolitics/
+scp docker-compose.yaml root@<ip>:/opt/careerpolitics/
+scp .env root@<ip>:/opt/careerpolitics/
 ```
 
-> **Note**: Make sure your `.env` file contains all necessary environment variables (e.g., database credentials, API keys). Keep it secure.
+---
 
-### 6. Start the Services
-
-On the droplet, inside `/opt/careerpolitics`, run:
+## 6. Start Services
 
 ```bash
 docker compose up -d
 ```
 
-This will:
-- Pull the `selenium/standalone-chrome:latest` image (if not already present)
-- Pull your application image from Docker Hub
-- Start both containers in detached mode
-
-Check that everything is running:
+Check:
 
 ```bash
 docker compose ps
 ```
 
-You should see both services with status `Up`.
+---
 
-### 7. Verify the Application
+## 7. Verify App
 
-Your application should be accessible at `http://<your-droplet-ip>:8080`.
-
-You can test with:
-
-```bash
-curl http://localhost:8080/actuator/health   # if Spring Boot Actuator is enabled
+```
+http://<your-ip>:8080
 ```
 
-Or open the IP in a browser.
+---
+
+# 🔄 Updating Application
+
+```bash
+docker compose pull
+docker compose up -d --force-recreate
+```
 
 ---
 
-## 🔧 Useful Commands for Maintenance
+# 🌐 Setup Domain + HTTPS
 
-- **View logs**:
-  ```bash
-  docker compose logs -f app
-  ```
-- **Stop services**:
-  ```bash
-  docker compose down
-  ```
-- **Restart services**:
-  ```bash
-  docker compose restart
-  ```
-- **Update the application**:
-    - Rebuild and push a new image locally.
-    - On the droplet, run:
-      ```bash
-      docker compose pull app
-      docker compose up -d
-      ```
+## 🎯 Goal
+
+```
+http://<ip>:8080 → https://qa.careerpolitics.com
+```
 
 ---
 
-## 🌐 Optional: Set Up a Domain and SSL
+## 1️⃣ DNS Configuration
 
-If you have a domain, you can point it to your droplet’s IP and use **Let’s Encrypt** to enable HTTPS. A common approach is to put an Nginx reverse proxy in front of the application.
+Add A record:
 
-Example steps:
-
-1. Install Nginx:
-   ```bash
-   apt install nginx
-   ```
-2. Configure a reverse proxy to `localhost:8080`.
-3. Use Certbot to obtain SSL certificates:
-   ```bash
-   apt install certbot python3-certbot-nginx
-   certbot --nginx -d your-domain.com
-   ```
+```
+qa → <server-ip>
+```
 
 ---
 
-## 🧹 Clean Up
+## 2️⃣ Install Nginx
 
-To remove all containers, networks, and volumes:
+```bash
+apt install nginx -y
+```
+
+---
+
+## 3️⃣ Configure Reverse Proxy
+
+```bash
+nano /etc/nginx/sites-available/qa.careerpolitics.com
+```
+
+Paste:
+
+```nginx
+server {
+    listen 80;
+    server_name qa.careerpolitics.com;
+
+    location / {
+        proxy_pass http://localhost:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+
+Enable:
+
+```bash
+ln -s /etc/nginx/sites-available/qa.careerpolitics.com /etc/nginx/sites-enabled/
+nginx -t
+systemctl restart nginx
+```
+
+---
+
+## 4️⃣ Test HTTP
+
+```
+http://qa.careerpolitics.com
+```
+
+If redirecting to HTTPS early:
+
+* Try incognito
+* Disable Cloudflare proxy (if used)
+
+---
+
+## 5️⃣ Enable HTTPS (SSL)
+
+```bash
+apt install certbot python3-certbot-nginx -y
+certbot --nginx -d qa.careerpolitics.com
+```
+
+---
+
+## 6️⃣ Final URL
+
+```
+https://qa.careerpolitics.com
+```
+
+---
+
+# 🔧 Useful Commands
+
+### Logs
+
+```bash
+docker compose logs -f careerpolitics-scraper
+```
+
+### Restart
+
+```bash
+docker compose restart
+```
+
+### Stop
+
+```bash
+docker compose down
+```
+
+---
+
+# ⚠️ Troubleshooting
+
+### Port issue
+
+```bash
+lsof -i :8080
+```
+
+---
+
+### Check Nginx
+
+```bash
+nginx -t
+systemctl status nginx
+```
+
+---
+
+### HTTPS not working
+
+* Ensure ports open:
+
+```bash
+ufw allow 80
+ufw allow 443
+```
+
+---
+
+### Selenium issues
+
+* Ensure service is running
+* Check logs
+
+---
+
+# 🧠 Best Practices
+
+* Do NOT expose port 8080 publicly (use Nginx)
+* Store secrets in `.env`
+* Use PostgreSQL instead of H2 for production
+
+---
+
+# 🔐 Optional: Protect QA
+
+```nginx
+auth_basic "Restricted";
+auth_basic_user_file /etc/nginx/.htpasswd;
+```
+
+---
+
+# 🧹 Cleanup
 
 ```bash
 docker compose down -v
-```
-
-To delete the application images:
-
-```bash
-docker rmi muraridevv/careerpolitics-job-scraper:1.0-SNAPSHOT
-docker rmi selenium/standalone-chrome:latest
+docker rmi muraridevv/careerpolitics-job-scraper
 ```
 
 ---
 
-## 📄 License
+# ✅ Final Architecture
 
-This project is licensed under the MIT License.
+```
+User → Domain (qa.careerpolitics.com)
+     → Nginx (80/443)
+     → Docker App (8080)
+     → Selenium Container
+```
 
 ---
 
-## 🆘 Troubleshooting
+# 🚀 Next Steps
 
-- **Port already in use**: Make sure port 8080 is free on the droplet. Stop any other service using it.
-- **Selenium connection refused**: Ensure the `selenium` service is healthy and the app can reach it via the service name (`selenium`) on port 4444 (Docker Compose internal networking).
-- **Permission denied for `.env`**: Set correct permissions: `chmod 600 .env`.
-- **Docker pull fails on droplet**: Check internet connectivity and proxy settings.
+* Add CI/CD (auto deploy)
+* Schedule scraper (cron/queue)
+* Add monitoring (Prometheus/Grafana)
 
-For further assistance, open an issue on the GitHub repository.
+---
