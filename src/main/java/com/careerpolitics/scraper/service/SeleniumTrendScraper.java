@@ -1,19 +1,14 @@
 package com.careerpolitics.scraper.service;
 
 import com.careerpolitics.scraper.model.response.TrendNewsItem;
-import io.github.bonigarcia.wdm.WebDriverManager;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.parser.Parser;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
-import org.openqa.selenium.MutableCapabilities;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.SessionNotCreatedException;
-import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.remote.RemoteWebDriver;
@@ -23,11 +18,8 @@ import org.springframework.stereotype.Component;
 
 import java.net.URLEncoder;
 import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -68,11 +60,6 @@ public class SeleniumTrendScraper {
 
     private final Random random = new Random();
 
-    @Value("${careerpolitics.content.selenium.persistent-profile-enabled:false}")
-    private boolean persistentProfileEnabled;
-
-    @Value("${careerpolitics.content.selenium.user-data-dir:profile}")
-    private String seleniumUserDataDir;
 
     @Value("${careerpolitics.content.selenium.remote-url:}")
     private String seleniumRemoteUrl;
@@ -82,19 +69,19 @@ public class SeleniumTrendScraper {
         if (!seleniumEnabled) {
             return List.of();
         }
+        if (!isRemoteSeleniumEnabled()) {
+            log.warn("Selenium is enabled but SELENIUM_REMOTE_URL is not configured. Skipping Selenium trends scrape.");
+            return List.of();
+        }
 
         String url = trendsUrl + "?geo=" + extractor.urlEncodePublic(geo) + "&hl=" + extractor.urlEncodePublic(language)
                 + "&category=9&status=active";
 
-        setupLocalChromeDriverIfNeeded();
-
         int effectiveAttempts = seleniumHeadless ? Math.max(1, maxAttempts) : 1;
         for (int attempt = 1; attempt <= effectiveAttempts; attempt++) {
             WebDriver driver = null;
-            DriverSession driverSession = null;
             try {
-                driverSession = createStealthChromeDriver(null, attempt);
-                driver = driverSession.driver();
+                driver = createRemoteChromeDriver(null);
                 driver.get(url);
 
                 new WebDriverWait(driver, Duration.ofSeconds(Math.max(8, timeoutSeconds)))
@@ -125,7 +112,6 @@ public class SeleniumTrendScraper {
                 log.warn("Selenium trends scrape attempt {} failed: {}", attempt, ex.getMessage());
             } finally {
                 quitDriver(driver);
-                cleanupProfileDir(driverSession);
             }
 
             randomSleep(800, 2200);
@@ -138,18 +124,19 @@ public class SeleniumTrendScraper {
         if (!seleniumEnabled || !seleniumNewsEnabled) {
             return List.of();
         }
+        if (!isRemoteSeleniumEnabled()) {
+            log.warn("Selenium news scraping is enabled but SELENIUM_REMOTE_URL is not configured. Returning no news items.");
+            return List.of();
+        }
 
-        setupLocalChromeDriverIfNeeded();
         ProxyManager proxyManager = new ProxyManager(parseProxyPool(proxyPool));
 
         int effectiveAttempts = seleniumHeadless ? Math.max(1, maxAttempts) : 1;
         for (int attempt = 1; attempt <= effectiveAttempts; attempt++) {
             String proxy = proxyManager.acquireProxy();
             WebDriver driver = null;
-            DriverSession driverSession = null;
             try {
-                driverSession = createStealthChromeDriver(proxy, attempt);
-                driver = driverSession.driver();
+                driver = createRemoteChromeDriver(proxy);
                 driver.get(searchUrl);
 
                 new WebDriverWait(driver, Duration.ofSeconds(Math.max(8, timeoutSeconds)))
@@ -204,43 +191,30 @@ public class SeleniumTrendScraper {
                 proxyManager.markBad(proxy);
             } finally {
                 quitDriver(driver);
-                cleanupProfileDir(driverSession);
             }
 
             randomSleep(1000, 3000);
         }
 
-        log.warn("Selenium scraping failed after retries for trend={}. Falling back to Google News RSS.", trend);
-        return scrapeGoogleNewsViaRss(trend, searchUrl, maxArticlesPerTrend, extractor);
+        log.warn("Selenium scraping failed after retries for trend={}. Returning no news items.", trend);
+        return List.of();
     }
 
-    private DriverSession createStealthChromeDriver(String proxy, int attempt) throws Exception {
-        Path profileDir = resolveProfileDir(attempt);
-        ChromeOptions options = buildChromeOptions(proxy, profileDir);
-        WebDriver driver = createWebDriver(options);
-        applyStealthCdpIfSupported(driver);
-        return new DriverSession(driver, profileDir);
-    }
-
-    private WebDriver createWebDriver(MutableCapabilities options) throws Exception {
-        if (isRemoteSeleniumEnabled()) {
-            log.info("Creating remote selenium session with URL={}", seleniumRemoteUrl);
-            return new RemoteWebDriver(new URL(seleniumRemoteUrl), options);
-        }
-        return new ChromeDriver((ChromeOptions) options);
-    }
-
-    private void setupLocalChromeDriverIfNeeded() {
+    private WebDriver createRemoteChromeDriver(String proxy) throws Exception {
         if (!isRemoteSeleniumEnabled()) {
-            WebDriverManager.chromedriver().setup();
+            throw new IllegalStateException("SELENIUM_REMOTE_URL is required for Selenium scraping in docker-compose deployments.");
         }
+
+        ChromeOptions options = buildChromeOptions(proxy);
+        log.info("Creating remote selenium session with URL={}", seleniumRemoteUrl);
+        return new RemoteWebDriver(new URL(seleniumRemoteUrl), options);
     }
 
     private boolean isRemoteSeleniumEnabled() {
         return seleniumRemoteUrl != null && !seleniumRemoteUrl.isBlank();
     }
 
-    private ChromeOptions buildChromeOptions(String proxy, Path profileDir) {
+    private ChromeOptions buildChromeOptions(String proxy) {
         ChromeOptions options = new ChromeOptions();
         if (seleniumHeadless) {
             options.addArguments("--headless=new");
@@ -251,9 +225,6 @@ public class SeleniumTrendScraper {
         options.addArguments("--disable-blink-features=AutomationControlled");
         options.addArguments("--lang=en-US,en;q=0.9");
         options.addArguments("--user-agent=" + REALISTIC_USER_AGENT);
-        if (profileDir != null) {
-            options.addArguments("--user-data-dir=" + profileDir.toAbsolutePath());
-        }
         options.setExperimentalOption("excludeSwitches", List.of("enable-automation"));
         options.setExperimentalOption("useAutomationExtension", false);
 
@@ -262,28 +233,6 @@ public class SeleniumTrendScraper {
         }
 
         return options;
-    }
-
-    private void applyStealthCdpIfSupported(WebDriver driver) {
-        if (!(driver instanceof ChromeDriver chromeDriver)) {
-            return;
-        }
-
-        try {
-            chromeDriver.executeCdpCommand("Page.addScriptToEvaluateOnNewDocument", java.util.Map.of(
-                    "source", "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
-                            + "Object.defineProperty(navigator, 'platform', {get: () => 'Win32'});"
-                            + "Object.defineProperty(navigator, 'language', {get: () => 'en-US'});"
-                            + "Object.defineProperty(navigator, 'languages', {get: () => ['en-US','en']});"
-            ));
-            chromeDriver.executeCdpCommand("Network.setUserAgentOverride", java.util.Map.of(
-                    "userAgent", REALISTIC_USER_AGENT,
-                    "acceptLanguage", "en-US,en;q=0.9",
-                    "platform", "Windows"
-            ));
-        } catch (Exception ex) {
-            log.debug("Failed to apply stealth CDP commands: {}", ex.getMessage());
-        }
     }
 
     private void dismissConsentIfPresent(WebDriver driver) {
@@ -458,60 +407,6 @@ public class SeleniumTrendScraper {
         }
     }
 
-    private List<TrendNewsItem> scrapeGoogleNewsViaRss(String trend,
-                                                       String searchUrl,
-                                                       int maxArticlesPerTrend,
-                                                       TrendArticleService extractor) {
-        try {
-            String language = "en-US";
-            String geo = "US";
-            String query = trend;
-
-            String rssUrl = "https://news.google.com/rss/search?q=" + extractor.urlEncodePublic(query)
-                    + "&hl=" + extractor.urlEncodePublic(language)
-                    + "&gl=" + extractor.urlEncodePublic(geo)
-                    + "&ceid=" + extractor.urlEncodePublic(geo + ":en");
-
-            String xml = Jsoup.connect(rssUrl)
-                    .ignoreContentType(true)
-                    .userAgent(REALISTIC_USER_AGENT)
-                    .timeout(Math.max(8000, timeoutSeconds * 1000))
-                    .execute()
-                    .body();
-
-            Document rssDoc = Jsoup.parse(xml, searchUrl, Parser.xmlParser());
-            List<TrendNewsItem> fallbackItems = new ArrayList<>();
-            for (Element item : rssDoc.select("item")) {
-                String link = item.selectFirst("link") != null ? item.selectFirst("link").text() : "";
-                String resolvedLink = extractor.resolveOriginalNewsUrl(link);
-                String title = item.selectFirst("title") != null ? item.selectFirst("title").text() : "";
-                String source = item.selectFirst("source") != null ? item.selectFirst("source").text() : "Google News";
-                String publishedAt = item.selectFirst("pubDate") != null ? item.selectFirst("pubDate").text() : "";
-                String descriptionHtml = item.selectFirst("description") != null ? item.selectFirst("description").text() : "";
-                String snippet = Jsoup.parse(descriptionHtml).text();
-
-                fallbackItems.add(TrendNewsItem.builder()
-                        .trend(trend)
-                        .title(title)
-                        .link(resolvedLink == null || resolvedLink.isBlank() ? link : resolvedLink)
-                        .source(source)
-                        .publishedAt(publishedAt)
-                        .snippet(snippet)
-                        .build());
-
-                if (fallbackItems.size() >= maxArticlesPerTrend) {
-                    break;
-                }
-            }
-
-            log.info("RSS fallback returned {} items for trend={}", fallbackItems.size(), trend);
-            return fallbackItems;
-        } catch (Exception ex) {
-            log.warn("RSS fallback failed for trend={}: {}", trend, ex.getMessage());
-            return List.of();
-        }
-    }
-
     private void quitDriver(WebDriver driver) {
         if (driver == null) {
             return;
@@ -542,42 +437,6 @@ public class SeleniumTrendScraper {
                 .filter(p -> !p.isBlank())
                 .toList();
     }
-
-    private Path resolveProfileDir(int attempt) throws Exception {
-        if (isRemoteSeleniumEnabled()) {
-            return null;
-        }
-
-        if (persistentProfileEnabled) {
-            Path base = Path.of(seleniumUserDataDir).toAbsolutePath();
-            Files.createDirectories(base);
-            return base;
-        }
-
-        Path tempDir = Files.createTempDirectory("selenium-profile-" + attempt + "-");
-        tempDir.toFile().deleteOnExit();
-        return tempDir;
-    }
-
-    private void cleanupProfileDir(DriverSession session) {
-        if (session == null || session.profileDir() == null || persistentProfileEnabled) {
-            return;
-        }
-
-        try {
-            Files.walk(session.profileDir())
-                    .sorted((a, b) -> b.compareTo(a))
-                    .forEach(path -> {
-                        try {
-                            Files.deleteIfExists(path);
-                        } catch (Exception ignored) {
-                        }
-                    });
-        } catch (Exception ignored) {
-        }
-    }
-
-    private record DriverSession(WebDriver driver, Path profileDir) {}
 
     private class ProxyManager {
         private final List<String> proxies;

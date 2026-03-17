@@ -51,9 +51,7 @@ careerpolitics:
       timeout-seconds: ${SELENIUM_TIMEOUT_SECONDS:20}
       max-attempts: ${SELENIUM_MAX_ATTEMPTS:5}
       proxy-pool: ${SELENIUM_PROXY_POOL:}
-      persistent-profile-enabled: ${SELENIUM_PERSISTENT_PROFILE_ENABLED:false}
-      user-data-dir: ${SELENIUM_USER_DATA_DIR:profile}
-      remote-url: ${SELENIUM_REMOTE_URL:}
+      remote-url: ${SELENIUM_REMOTE_URL:http://selenium:4444/wd/hub}
     ai:
       openrouter:
         base-url: https://openrouter.ai/api/v1
