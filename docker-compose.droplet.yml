@@ -1,0 +1,20 @@
+services:
+  careerpolitics-job-extractor:
+    image: ${IMAGE_NAME:?set IMAGE_NAME}/${IMAGE_REPO:-careerpolitics-job-extractor}:${IMAGE_TAG:-latest}
+    container_name: careerpolitics-job-extractor
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env.droplet
+    environment:
+      # Container-safe defaults for Selenium scraping
+      CAREERPOLITICS_CONTENT_SELENIUM_HEADLESS: "true"
+      CAREERPOLITICS_CONTENT_SELENIUM_MANUAL_VERIFICATION_WAIT_ENABLED: "false"
+      SPRING_PROFILES_ACTIVE: "prod"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
