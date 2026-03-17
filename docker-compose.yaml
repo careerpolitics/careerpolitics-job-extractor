@@ -1,0 +1,16 @@
+services:
+  app:
+    image: muraridevv/careerpolitics-job-scraper:1.0-SNAPSHOT
+    container_name: careerpolitics-scraper
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    depends_on:
+      - selenium
+
+  selenium:
+    image: selenium/standalone-chrome:latest
+    container_name: selenium
+    ports:
+      - "4444:4444"

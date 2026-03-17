@@ -70,7 +70,7 @@ tasks.named('bootJar') {
 
 jib {
     from {
-        image = "selenium/standalone-chrome:latest"
+        image = "eclipse-temurin:21-jre"
     }
     to {
         image = System.getenv('IMAGE_NAME') ?: "muraridevv/careerpolitics-job-scraper"
@@ -81,10 +81,5 @@ jib {
         ports = ['8080']
         jvmFlags = ['-XX:+UseContainerSupport', '-XX:MaxRAMPercentage=75.0']
         creationTime = 'USE_CURRENT_TIMESTAMP'
-        environment = [
-                'SERVER_PORT': '8080',
-                'SELENIUM_HEADLESS': 'true'
-        ]
-        user = '1200:1200'
     }
 }
