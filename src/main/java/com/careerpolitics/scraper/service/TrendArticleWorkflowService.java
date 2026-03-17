@@ -40,10 +40,14 @@ public class TrendArticleWorkflowService {
         );
 
         if (trends.isEmpty()) {
+            String message = discoveredTrends.isEmpty()
+                    ? "No trending items found from Google Trends and no fallbackTrends were provided"
+                    : "All discovered trends were processed recently and are still inside the cooldown window";
+            String errorCode = discoveredTrends.isEmpty() ? "trends_discovery_failed" : "trends_skipped_by_cooldown";
             throw new WorkflowStepException(
                     HttpStatus.NOT_FOUND,
-                    "No trending items found from Google Trends and no fallbackTrends were provided",
-                    List.of("trends_discovery_failed")
+                    message,
+                    List.of(errorCode)
             );
         }
 

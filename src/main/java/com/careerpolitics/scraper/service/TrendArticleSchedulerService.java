@@ -34,7 +34,7 @@ public class TrendArticleSchedulerService {
     @Value("${careerpolitics.content.trends.scheduler.publish:true}")
     private boolean publish;
 
-    @Value("${careerpolitics.content.trends.scheduler.trend-cooldown-hours:24}")
+    @Value("${careerpolitics.content.trends.scheduler.trend-cooldown-hours:168}")
     private int trendCooldownHours;
 
     @Value("${careerpolitics.content.trends.scheduler.fallback-trends:}")
