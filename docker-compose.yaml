@@ -6,13 +6,17 @@ services:
       - "8080:8080"
     env_file:
       - .env
-    environment:
-      SELENIUM_REMOTE_URL: ${SELENIUM_REMOTE_URL:-http://selenium:4444/wd/hub}
     depends_on:
       - selenium
 
   selenium:
     image: selenium/standalone-chrome:latest
     container_name: selenium
+    shm_size: 1g                 # 🔴 Critical: Chrome needs enough shared memory
+    mem_limit: 1g                # 🟢 Limits total container memory to 1.5GB (leave ~500MB for OS and app)
+    cpus: '1'                     # 🟢 Limits to 1 CPU core
     ports:
       - "4444:4444"
+    environment:
+      - SE_NODE_MAX_SESSIONS=1    # 🟢 Only one browser session at a time
+      - SE_JAVA_OPTS=-Xmx1g        # 🟢 Limits JVM heap size to 1GB
