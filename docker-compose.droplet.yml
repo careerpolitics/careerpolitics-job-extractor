@@ -1,8 +1,6 @@
 services:
   careerpolitics-job-extractor:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ${IMAGE_NAME:?set IMAGE_NAME}/${IMAGE_REPO:-careerpolitics-job-extractor}:${IMAGE_TAG:-latest}
     container_name: careerpolitics-job-extractor
     restart: unless-stopped
     ports:

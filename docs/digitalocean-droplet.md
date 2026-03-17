@@ -1,6 +1,6 @@
-# Deploy to a DigitalOcean Droplet (Docker Compose)
+# Deploy to a DigitalOcean Droplet (using Docker Hub image)
 
-This guide replaces App Platform deployment and runs the scraper directly on a Droplet.
+This flow builds the image on your local machine, pushes it to Docker Hub, and deploys that image on the Droplet.
 
 ## 1) Create Droplet
 - Ubuntu 22.04 LTS
@@ -9,7 +9,7 @@ This guide replaces App Platform deployment and runs the scraper directly on a D
   - `22` for SSH
   - `8080` for direct API access (or `80/443` if reverse proxy is used)
 
-## 2) Install Docker + Compose plugin
+## 2) Install Docker + Compose plugin on Droplet
 ```bash
 sudo apt-get update
 sudo apt-get install -y ca-certificates curl gnupg
@@ -29,10 +29,8 @@ sudo usermod -aG docker $USER
 
 Log out/in once so Docker group permissions apply.
 
-## 3) Clone project and configure env
+## 3) Prepare env vars locally
 ```bash
-git clone <YOUR_REPO_URL>
-cd careerpolitics-job-extractor
 cp .env.droplet.example .env.droplet
 nano .env.droplet
 ```
@@ -42,13 +40,34 @@ Set at least:
 - `CAREERPOLITICS_CONTENT_ARTICLE_API_URL`
 - `CAREERPOLITICS_CONTENT_ARTICLE_API_TOKEN`
 
-## 4) Build and run
+## 4) Build image locally and push to Docker Hub
 ```bash
-docker compose -f docker-compose.droplet.yml up -d --build
+IMAGE_NAME=<dockerhub_username> \
+IMAGE_REPO=careerpolitics-job-extractor \
+IMAGE_TAG=v1 \
+./scripts/dockerhub-build-push.sh
 ```
 
-## 5) Verify
+## 5) Deploy pushed image to Droplet
 ```bash
+DROPLET_HOST=<droplet_ip> \
+DROPLET_USER=root \
+IMAGE_NAME=<dockerhub_username> \
+IMAGE_REPO=careerpolitics-job-extractor \
+IMAGE_TAG=v1 \
+./scripts/droplet-deploy-image.sh
+```
+
+This script uploads:
+- `docker-compose.droplet.yml`
+- `.env.droplet`
+
+Then it runs `docker compose pull` + `docker compose up -d` on Droplet.
+
+## 6) Verify on Droplet
+```bash
+ssh root@<droplet_ip>
+cd /opt/careerpolitics-job-extractor
 docker compose -f docker-compose.droplet.yml ps
 docker compose -f docker-compose.droplet.yml logs -f
 curl http://localhost:8080/actuator/health
@@ -56,35 +75,11 @@ curl http://localhost:8080/actuator/health
 
 API endpoint test:
 ```bash
-curl "http://localhost:8080/api/careerpolitics/content/trends/discover?geo=IN&language=en-US&maxTrends=5"
+curl "http://<droplet_ip>:8080/api/careerpolitics/content/trends/discover?geo=IN&language=en-US&maxTrends=5"
 ```
 
-## 6) Update deployment
+## 7) Update deployment (new image tag)
 ```bash
-git pull
-docker compose -f docker-compose.droplet.yml up -d --build
-```
-
-## 7) Optional systemd auto-start (on boot)
-```bash
-sudo tee /etc/systemd/system/careerpolitics-job-extractor.service > /dev/null <<'UNIT'
-[Unit]
-Description=CareerPolitics Job Extractor
-After=docker.service
-Requires=docker.service
-
-[Service]
-Type=oneshot
-WorkingDirectory=/home/<YOUR_USER>/careerpolitics-job-extractor
-RemainAfterExit=yes
-ExecStart=/usr/bin/docker compose -f docker-compose.droplet.yml up -d --build
-ExecStop=/usr/bin/docker compose -f docker-compose.droplet.yml down
-TimeoutStartSec=0
-
-[Install]
-WantedBy=multi-user.target
-UNIT
-
-sudo systemctl daemon-reload
-sudo systemctl enable --now careerpolitics-job-extractor
+IMAGE_NAME=<dockerhub_username> IMAGE_REPO=careerpolitics-job-extractor IMAGE_TAG=v2 ./scripts/dockerhub-build-push.sh
+DROPLET_HOST=<droplet_ip> DROPLET_USER=root IMAGE_NAME=<dockerhub_username> IMAGE_REPO=careerpolitics-job-extractor IMAGE_TAG=v2 ./scripts/droplet-deploy-image.sh
 ```

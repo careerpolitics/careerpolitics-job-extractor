@@ -140,10 +140,11 @@ When `TRENDS_SCHEDULER_ENABLED=true`, the service triggers the same trend articl
 - Environment template: `.env.droplet.example`
 - Step-by-step guide: `docs/digitalocean-droplet.md`
 
-Quick deploy on Droplet:
+Quick deploy (build locally, push to Docker Hub, run on Droplet):
 ```bash
 cp .env.droplet.example .env.droplet
 # edit .env.droplet with production values
 
-docker compose -f docker-compose.droplet.yml up -d --build
+IMAGE_NAME=<dockerhub_username> IMAGE_REPO=careerpolitics-job-extractor IMAGE_TAG=v1 ./scripts/dockerhub-build-push.sh
+DROPLET_HOST=<droplet_ip> DROPLET_USER=root IMAGE_NAME=<dockerhub_username> IMAGE_REPO=careerpolitics-job-extractor IMAGE_TAG=v1 ./scripts/droplet-deploy-image.sh
 ```
