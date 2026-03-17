@@ -147,3 +147,112 @@ doctl apps create --spec .do/app.yaml
 
 ### App Platform Docker build note
 The Dockerfile builds the JAR inside a multi-stage build, so App Platform does not require a prebuilt `build/libs/*.jar` artifact in the repo context.
+
+## Simple Docker Production Workflow
+
+### 1) Create runtime env file
+Copy the example and fill real values:
+```bash
+cp .env.example .env
+```
+
+Never bake secrets into Docker image. The container reads values from `--env-file .env` at runtime.
+
+### 2) Build image locally
+```bash
+./scripts/build.sh
+```
+
+Custom name/tag:
+```bash
+IMAGE_NAME=yourdockerhub/careerpolitics-scraper VERSION=1.0.0 ./scripts/build.sh
+```
+
+### 3) Run locally with env file
+```bash
+docker run --rm --name careerpolitics-local \
+  --env-file .env \
+  -p 8080:8080 \
+  yourdockerhub/careerpolitics-scraper:1.0.0
+```
+
+Check logs:
+```bash
+docker logs -f careerpolitics-local
+```
+
+Verify app:
+```bash
+curl -fsS http://localhost:8080/actuator/health
+```
+
+### 4) Push to Docker Hub / Registry
+Login once:
+```bash
+docker login
+```
+
+Push version + latest tags:
+```bash
+IMAGE_NAME=yourdockerhub/careerpolitics-scraper VERSION=1.0.0 ./scripts/push.sh
+```
+
+Manual equivalent:
+```bash
+docker push yourdockerhub/careerpolitics-scraper:1.0.0
+docker push yourdockerhub/careerpolitics-scraper:latest
+```
+
+### 5) Deploy on DigitalOcean Droplet
+On the server:
+
+Install Docker:
+```bash
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+Create deployment folder and env file:
+```bash
+mkdir -p ~/careerpolitics && cd ~/careerpolitics
+nano .env
+```
+
+Pull + run image:
+```bash
+IMAGE_NAME=yourdockerhub/careerpolitics-scraper VERSION=1.0.0 ENV_FILE=.env APP_PORT=8080 bash -c "$(curl -fsSL https://raw.githubusercontent.com/<your-org>/<your-repo>/<your-branch>/scripts/deploy.sh)"
+```
+
+Or if repository is cloned on server:
+```bash
+cd ~/careerpolitics-job-extractor
+IMAGE_NAME=yourdockerhub/careerpolitics-scraper VERSION=1.0.0 ENV_FILE=.env APP_PORT=8080 ./scripts/deploy.sh
+```
+
+### 6) Reliability and operations
+- Restart policy is `unless-stopped` (auto-start after reboot).
+- See running container:
+```bash
+docker ps
+```
+- Follow logs:
+```bash
+docker logs -f careerpolitics-scraper
+```
+- Restart manually:
+```bash
+docker restart careerpolitics-scraper
+```
+
+### Optional: docker compose
+```bash
+cp .env.example .env
+IMAGE_NAME=yourdockerhub/careerpolitics-scraper VERSION=1.0.0 docker compose up -d
+```
+
+### Troubleshooting
+- **Container exits immediately**: `docker logs careerpolitics-scraper` and confirm required env vars in `.env`.
+- **Health check unhealthy**: ensure app exposes `/actuator/health` and startup has completed.
+- **Chrome/Selenium issues**: keep `SELENIUM_HEADLESS=true` in server env.
+- **Port already in use**: change `APP_PORT` (for example `APP_PORT=8081`).
