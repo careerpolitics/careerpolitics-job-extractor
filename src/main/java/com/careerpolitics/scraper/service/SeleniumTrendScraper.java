@@ -80,7 +80,9 @@ public class SeleniumTrendScraper {
         String url = trendsUrl + "?geo=" + extractor.urlEncodePublic(geo) + "&hl=" + extractor.urlEncodePublic(language)
                 + "&category=9&status=active";
 
-        WebDriverManager.chromedriver().setup();
+        if (!setupChromeDriverBinary()) {
+            return List.of();
+        }
 
         int effectiveAttempts = seleniumHeadless ? Math.max(1, maxAttempts) : 1;
         for (int attempt = 1; attempt <= effectiveAttempts; attempt++) {
@@ -133,7 +135,9 @@ public class SeleniumTrendScraper {
             return List.of();
         }
 
-        WebDriverManager.chromedriver().setup();
+        if (!setupChromeDriverBinary()) {
+            return scrapeGoogleNewsViaRss(trend, searchUrl, maxArticlesPerTrend, extractor);
+        }
         ProxyManager proxyManager = new ProxyManager(parseProxyPool(proxyPool));
 
         int effectiveAttempts = seleniumHeadless ? Math.max(1, maxAttempts) : 1;
@@ -206,6 +210,16 @@ public class SeleniumTrendScraper {
 
         log.warn("Selenium scraping failed after retries for trend={}. Falling back to Google News RSS.", trend);
         return scrapeGoogleNewsViaRss(trend, searchUrl, maxArticlesPerTrend, extractor);
+    }
+
+    private boolean setupChromeDriverBinary() {
+        try {
+            WebDriverManager.chromedriver().setup();
+            return true;
+        } catch (Throwable throwable) {
+            log.warn("Chromedriver setup failed. Falling back to non-Selenium scraping: {}", throwable.getMessage());
+            return false;
+        }
     }
 
     private DriverSession createStealthChromeDriver(String proxy, int attempt) throws Exception {
