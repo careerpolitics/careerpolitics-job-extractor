@@ -152,7 +152,7 @@ public class TrendArticleWorkflowService {
             );
         }
 
-        TrendGeneratedArticle first = generatedArticles.getFirst();
+        TrendGeneratedArticle first = generatedArticles.get(0);
         return TrendArticleResponse.builder()
                 .trends(trends)
                 .news(allNews)

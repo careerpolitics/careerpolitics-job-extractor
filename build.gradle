@@ -84,7 +84,7 @@ tasks.named('bootJar') {
 
 jib {
     from {
-        image = 'eclipse-temurin:21-jre-alpine'
+        image = 'eclipse-temurin:17-jre-alpine'
     }
     to {
         image = "careerpolitics/scraper:${version}"
