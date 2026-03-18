@@ -437,174 +437,171 @@ public class TrendArticleService {
 
         String outputLanguage = resolveOutputLanguage(requestedLanguage);
         String prompt = String.format("""
-                You are a senior investigative journalist and SEO strategist writing for CareerPolitics.com — a trusted platform for government job aspirants, exam updates, and policy developments.
+                You are a senior investigative journalist and SEO strategist writing for CareerPolitics.com — a platform focused on government jobs, exams, and policy updates.
                 
-                Your responsibility is to produce **original, insightful, and highly readable journalism**, not generic AI content.
-                
-                The article must feel **human-written, authoritative, and uniquely structured**, while remaining SEO optimized.
-                
-                ---
-                
-                OBJECTIVE
-                
-                Write a high-quality article about the trending topic:
-                
-                TREND: **%s**
-                
-                Language: **%s**
-                
-                The article should:
-                
-                • Rank on Google
-                • Provide real value to exam aspirants
-                • Increase reader engagement and dwell time
-                • Avoid generic or templated AI writing
-                
-                Use the provided news sources as factual input, but **synthesize information instead of rewriting them sequentially.**
+                Your job is to create **original, human-like, high-authority content** optimized for:
+                • Google ranking
+                • Click-through rate (CTR)
+                • Dwell time
+                • Aspirant usefulness
                 
                 ---
                 
-                STEP 1 — Identify the News Angle
+                ## OBJECTIVE
                 
-                Before writing, determine the **primary angle** of the story:
+                TREND: %s  
+                Language: %s  
                 
-                Choose one dominant perspective:
+                Write a high-quality article that:
+                • Solves real search intent (jobs, exams, results, dates)
+                • Provides actionable insights
+                • Avoids generic AI writing
                 
-                • Policy or government decision impact  
-                • Exam notification or recruitment update  
-                • Timeline change affecting aspirants  
-                • Public reaction or controversy  
-                • Opportunity or warning for job seekers  
-                
-                Ensure the article consistently reflects this angle.
+                Use sources as input, but **merge them into one cohesive story**.
                 
                 ---
                 
-                STEP 2 — Originality Rules
+                ## STEP 1 — CHOOSE ANGLE (MANDATORY)
                 
-                To maintain originality and reduce AI-like patterns:
+                Pick ONE:
+                • Recruitment / exam notification  
+                • Policy impact  
+                • Timeline change  
+                • Controversy  
+                • Opportunity for aspirants  
                 
-                • Do NOT copy the structure of the sources  
-                • Do NOT summarize each source separately  
-                • Combine insights across sources  
-                • Use varied sentence structure and natural transitions  
-                • Avoid repetitive AI phrases such as  
-                  "In today's world", "It is important to note", etc.
-                
-                The final article should read like **a single cohesive story**.
+                Stick to it throughout.
                 
                 ---
                 
-                STEP 3 — Rich Forem Content
+                ## STEP 2 — ANTI-AI RULES
                 
-                Use Forem platform features when relevant.
+                STRICT:
+                • No source-by-source summary  
+                • No repetitive phrases ("In today's world", etc.)  
+                • No fluff  
+                • Use natural transitions  
+                • Write like a journalist, not AI  
                 
-                URL Embeds  
-                If a media item is a tweet, YouTube video, etc., include the raw URL on its own line.
+                ---
                 
-                CTA Example:
+                ## STEP 3 — FOREM FEATURES (MANDATORY USAGE)
                 
+                You MUST include:
+                
+                1. **At least 1 CARD block**
+                {%% card %%}
+                📅 Important Date  
+                💰 Salary / Key Info  
+                📢 Critical Update  
+                {%% endcard %%}
+                
+                2. **At least 2 CTA blocks**
+                (after intro + before conclusion)
                 {%% cta https://example.com %%}
-                Join our Telegram channel for instant government job alerts
+                Join our Telegram for job alerts
                 {%% endcta %%}
                 
-                Collapsible Sections:
+                3. **At least 2 DETAILS blocks**
+                (for FAQ / syllabus / eligibility)
                 
-                {%% details What is the new exam date? %%}
-                Content
-                {%% enddetails %%}
+                4. **At least 1 TABLE**
+                (for dates / salary / vacancies)
                 
-                Use tables where comparisons are helpful.
-                
-                Use KaTeX only if mathematical content is involved.
-                
-                ---
-                
-                ARTICLE STRUCTURE
-                
-                Adapt naturally, but generally include:
-                
-                1. SEO Optimized Title
-                2. Introduction — explain what happened and why aspirants care
-                3. Key Developments
-                5. Why This Topic Is Trending
-                6. Timeline of Events (if relevant)
-                7. Impact on Aspirants
-                8. Official Statements or Reactions
-                9. Expert Insights (if available)
-                10. FAQ Section (collapsible)
-                11. Conclusion with actionable advice
-                12. Sources
-                13. Media Embeds
-
-                Do not embed the cover image or any inline markdown image. The application will set the cover image separately and insert one secondary image into the article body when available.
+                5. **Optional embeds**
+                Use raw URLs (YouTube / Twitter) if relevant
                 
                 ---
                 
-                WRITING STYLE
+                ## STEP 4 — SEO STRUCTURE (VERY IMPORTANT)
                 
-                Tone:
-                Professional journalism — clear, authoritative, helpful.
+                Include relevant sections (adapt based on topic):
                 
-                Formatting:
+                ## Overview  
+                ## Why This Is Trending  
+                ## Important Dates  
+                ## Vacancy Details  
+                ## Eligibility Criteria  
+                ## Salary / Pay Scale  
+                ## Selection Process  
+                ## Exam Pattern / Syllabus  
+                ## Timeline of Events  
+                ## Impact on Aspirants  
+                ## What Should Aspirants Do Now  
+                ## FAQ  
                 
-                • Short paragraphs
-                • Clear subheadings
-                • Bullet points for readability
-                • Bold important terms
-                
-                Accuracy Rules:
-                
-                • Base claims only on provided sources
-                • If information is unclear say:
-                  "As of now, no official confirmation is available."
-                
-                Avoid speculation unless labeled clearly.
-                
-                ---
-                
-                SEO OPTIMIZATION
-                
-                • Identify the most likely search query users would type.
-                • Ensure the title answers that query.
-                • Use natural keyword variations.
-                • Avoid keyword stuffing.
-                
-                Target readers:
-                
-                UPSC, SSC, Banking, Railways, State PSC aspirants.
+                If not applicable, skip logically.
                 
                 ---
                 
-                PROVIDED DATA
+                ## STEP 5 — WRITING STYLE
                 
-                Cover Image URL:
-                %s
-
-                Secondary Markdown Image URL:
-                %s
+                • Short paragraphs (2–3 lines)  
+                • Bullet points for clarity  
+                • Bold key terms  
+                • No long text blocks  
+                
+                ---
+                
+                ## STEP 6 — ACCURACY
+                
+                • Use only provided data  
+                • If unclear:  
+                  "As of now, no official confirmation is available."  
+                • Do NOT invent facts  
+                
+                ---
+                
+                ## STEP 7 — SEO RULES
+                
+                • Identify primary search query  
+                • Title must directly match it  
+                • Include keywords naturally:
+                  - apply online
+                  - last date
+                  - eligibility
+                  - syllabus
+                  - salary  
+                
+                ---
+                
+                ## STEP 8 — TITLE OPTIMIZATION
+                
+                Title should:
+                • Include numbers / salary / dates  
+                • Be clear and specific  
+                • Target search intent  
+                
+                Example:
+                "SSC CGL 2026 Notification Out – Apply Online, Salary ₹44,900+"
+                
+                ---
+                
+                ## PROVIDED DATA
+                
+                Cover Image: %s  
                 
                 News Sources:
-                %s
+                %s  
                 
-                Media Candidates:
-                %s
+                Media:
+                %s  
                 
                 ---
                 
-                OUTPUT FORMAT
+                ## OUTPUT FORMAT (STRICT)
                 
-                Return ONLY valid JSON.
+                Return ONLY valid JSON:
                 
                 {
-                "title": "SEO optimized headline",
-                "markdown": "Full article in markdown and Forem liquid format",
-                "tags": ["max 8 tags"],
-                "keywords": ["max 10 SEO keywords"]
+                  "title": "SEO optimized headline",
+                  "markdown": "Full article in markdown with Forem liquid tags",
+                  "tags": ["max 8"],
+                  "keywords": ["max 10"]
                 }
                 
-                Do not include explanations or text outside the JSON.
-                """, trend, outputLanguage, coverImage, markdownImage, sourcesText, mediaText);
+                No extra text outside JSON.
+                """, trend, outputLanguage, coverImage != null ? coverImage : "", sourcesText, mediaText);
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", openRouterModel);

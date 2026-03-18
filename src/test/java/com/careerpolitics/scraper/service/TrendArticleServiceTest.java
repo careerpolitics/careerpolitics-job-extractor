@@ -57,6 +57,31 @@ class TrendArticleServiceTest {
         assertEquals("https://publisher.com/story?id=1", resolved);
     }
 
+
+    @Test
+    void prepareMarkdownForPublishing_shouldRemoveDuplicateCoverImageFromMarkdown() {
+        TrendArticleService service = new TrendArticleService(new ObjectMapper(), new SeleniumTrendScraper());
+
+        String coverImage = "https://cdn.example.com/image.jpg";
+        String markdown = "![Cover](https://cdn.example.com/image.jpg)\n\n# Heading\n\nBody copy";
+
+        String prepared = service.prepareMarkdownForPublishing(markdown, coverImage);
+
+        assertEquals("# Heading\n\nBody copy", prepared);
+    }
+
+    @Test
+    void prepareMarkdownForPublishing_shouldKeepOtherImagesUntouched() {
+        TrendArticleService service = new TrendArticleService(new ObjectMapper(), new SeleniumTrendScraper());
+
+        String coverImage = "https://cdn.example.com/cover.jpg";
+        String markdown = "![Inline](https://cdn.example.com/other.jpg)\n\nBody copy";
+
+        String prepared = service.prepareMarkdownForPublishing(markdown, coverImage);
+
+        assertEquals(markdown, prepared);
+    }
+
     @Test
     void attachMarkdownImage_shouldPrependSecondaryImage() {
         TrendArticleService service = new TrendArticleService(new ObjectMapper(), new SeleniumTrendScraper());
