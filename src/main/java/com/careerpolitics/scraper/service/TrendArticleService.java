@@ -106,15 +106,18 @@ public class TrendArticleService {
         mediaItems.addAll(gatherMediaForTrend(trend, geo, language));
 
         List<TrendMediaItem> trimmed = mediaItems.stream().distinct().limit(Math.max(1, maxMediaItems)).toList();
-        return new TrendMediaBundle(trimmed, pickCoverImage(trimmed));
+        String coverImage = pickCoverImage(trimmed);
+        String markdownImage = pickMarkdownImage(trimmed, coverImage);
+        return new TrendMediaBundle(trimmed, coverImage, markdownImage);
     }
 
     public Map<String, Object> generateArticleData(String trend,
                                                    List<TrendNewsItem> newsItems,
                                                    List<TrendMediaItem> mediaItems,
                                                    String coverImage,
+                                                   String markdownImage,
                                                    String language) {
-        return generateArticleWithClaudeViaOpenRouter(trend, newsItems, mediaItems, coverImage, language);
+        return generateArticleWithClaudeViaOpenRouter(trend, newsItems, mediaItems, coverImage, markdownImage, language);
     }
 
     public Map<String, Object> publishArticle(String title,
@@ -129,16 +132,17 @@ public class TrendArticleService {
         return publishToCareerPolitics(title, markdown, tags, trend, newsItems, coverImage, publish, requestArticleApiToken, requestOrganizationId);
     }
 
-    public String prepareMarkdownForPublishing(String markdown, String coverImage) {
-        String safeMarkdown = markdown == null ? "" : markdown;
-        if (coverImage == null || coverImage.isBlank()) {
-            return safeMarkdown.trim();
+    public String attachMarkdownImage(String markdown, String markdownImage) {
+        String safeMarkdown = markdown == null ? "" : markdown.trim();
+        if (markdownImage == null || markdownImage.isBlank()) {
+            return safeMarkdown;
         }
 
-        String normalizedCoverImage = java.util.regex.Pattern.quote(coverImage.trim());
-        String withoutMarkdownImage = safeMarkdown.replaceAll("(?im)^\\s*!\\[[^\\]]*]\\(" + normalizedCoverImage + "\\)\\s*\\r?\\n?", "");
-        String withoutHtmlImage = withoutMarkdownImage.replaceAll("(?is)<img[^>]*src\\s*=\\s*[\"\']" + normalizedCoverImage + "[\"\'][^>]*>\\s*", "");
-        return withoutHtmlImage.trim();
+        String imageBlock = "![Trend image](" + markdownImage.trim() + ")";
+        if (safeMarkdown.isBlank()) {
+            return imageBlock;
+        }
+        return imageBlock + "\n\n" + safeMarkdown;
     }
 
     public List<String> pickDefaultTagsForTrend(String trend) {
@@ -352,6 +356,18 @@ public class TrendArticleService {
         return "";
     }
 
+    String pickMarkdownImage(List<TrendMediaItem> mediaItems, String coverImage) {
+        for (TrendMediaItem item : mediaItems) {
+            if (!"image".equalsIgnoreCase(item.getType()) || item.getUrl() == null || item.getUrl().isBlank()) {
+                continue;
+            }
+            if (!item.getUrl().equals(coverImage)) {
+                return item.getUrl();
+            }
+        }
+        return "";
+    }
+
     List<TrendMediaItem> gatherMediaForTrend(String trend, String geo, String language) {
         List<TrendMediaItem> media = new ArrayList<>();
         media.addAll(fetchYoutubeMedia(trend));
@@ -409,7 +425,7 @@ public class TrendArticleService {
         }
     }
 
-    Map<String, Object> generateArticleWithClaudeViaOpenRouter(String trend, List<TrendNewsItem> newsItems, List<TrendMediaItem> mediaItems, String coverImage, String requestedLanguage) {
+    Map<String, Object> generateArticleWithClaudeViaOpenRouter(String trend, List<TrendNewsItem> newsItems, List<TrendMediaItem> mediaItems, String coverImage, String markdownImage, String requestedLanguage) {
         if (openRouterApiKey == null || openRouterApiKey.isBlank()) {
             throw new IllegalStateException("OpenRouter API key is missing. Set careerpolitics.content.ai.openrouter.api-key");
         }
@@ -625,7 +641,7 @@ public class TrendArticleService {
         }
 
         List<String> safeTags = sanitizeTags(tags);
-        String safeMarkdown = prepareMarkdownForPublishing(markdown, coverImage);
+        String safeMarkdown = markdown == null ? "" : markdown;
         String description = buildDescription(trend, newsItems);
         String effectiveArticleApiToken = firstNonBlank(requestArticleApiToken, articleApiToken);
         Long effectiveOrganizationId = requestOrganizationId != null ? requestOrganizationId : articleApiOrganizationId;
@@ -829,7 +845,7 @@ public class TrendArticleService {
         return link;
     }
 
-    public record TrendMediaBundle(List<TrendMediaItem> items, String coverImage) {
+    public record TrendMediaBundle(List<TrendMediaItem> items, String coverImage, String markdownImage) {
     }
 
     Map<String, String> parseQueryParams(String rawQuery) {

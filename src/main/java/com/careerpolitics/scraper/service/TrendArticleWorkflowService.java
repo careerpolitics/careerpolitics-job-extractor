@@ -82,6 +82,7 @@ public class TrendArticleWorkflowService {
                 stepErrors.add("media_fetch_warning: no media extracted for trend=" + trend);
             }
             String coverImage = mediaBundle.coverImage();
+            String markdownImage = mediaBundle.markdownImage();
 
             Map<String, Object> articleData;
             try {
@@ -90,12 +91,13 @@ public class TrendArticleWorkflowService {
                         newsItems,
                         mediaItems,
                         coverImage,
+                        markdownImage,
                         request.getLanguage()
                 );
             } catch (Exception ex) {
                 stepErrors.add("article_generation_failed: " + ex.getMessage());
                 workflowErrors.add("AI generation failed for trend " + trend + ": " + ex.getMessage());
-                articleData = fallbackArticleData(trend, newsItems);
+                articleData = fallbackArticleData(trend, newsItems, markdownImage);
             }
 
             @SuppressWarnings("unchecked")
@@ -111,9 +113,9 @@ public class TrendArticleWorkflowService {
             String title = String.valueOf(
                     articleData.getOrDefault("title", trend + " - Latest Jobs & Education Update")
             );
-            String markdown = trendArticleService.prepareMarkdownForPublishing(
+            String markdown = trendArticleService.attachMarkdownImage(
                     String.valueOf(articleData.getOrDefault("markdown", "")),
-                    coverImage
+                    markdownImage
             );
 
             boolean requestedPublished = request.shouldPublish();
@@ -175,7 +177,8 @@ public class TrendArticleWorkflowService {
     }
 
     private Map<String, Object> fallbackArticleData(String trend,
-                                                    List<TrendNewsItem> newsItems) {
+                                                    List<TrendNewsItem> newsItems,
+                                                    String markdownImage) {
         StringBuilder markdown = new StringBuilder();
         markdown.append("## ").append(trend).append(" - Update\n\n");
         markdown.append("We could not generate full AI article content right now. Here are the latest collected details.\n\n");
@@ -189,7 +192,7 @@ public class TrendArticleWorkflowService {
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("title", trend + " - Latest Jobs & Education Update");
-        result.put("markdown", markdown.toString());
+        result.put("markdown", trendArticleService.attachMarkdownImage(markdown.toString(), markdownImage));
         result.put("tags", trendArticleService.pickDefaultTagsForTrend(trend));
         result.put("keywords", trendArticleService.pickDefaultKeywordsForTrend(trend));
         return result;

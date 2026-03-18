@@ -1,5 +1,6 @@
 package com.careerpolitics.scraper.service;
 
+import com.careerpolitics.scraper.model.response.TrendMediaItem;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -79,6 +80,32 @@ class TrendArticleServiceTest {
         String prepared = service.prepareMarkdownForPublishing(markdown, coverImage);
 
         assertEquals(markdown, prepared);
+    }
+
+    @Test
+    void attachMarkdownImage_shouldPrependSecondaryImage() {
+        TrendArticleService service = new TrendArticleService(new ObjectMapper(), new SeleniumTrendScraper());
+
+        String markdown = "# Heading\n\nBody copy";
+
+        String prepared = service.attachMarkdownImage(markdown, "https://cdn.example.com/body.jpg");
+
+        assertEquals("![Trend image](https://cdn.example.com/body.jpg)\n\n# Heading\n\nBody copy", prepared);
+    }
+
+    @Test
+    void pickMarkdownImage_shouldSkipCoverImageAndUseNextImage() {
+        TrendArticleService service = new TrendArticleService(new ObjectMapper(), new SeleniumTrendScraper());
+
+        var mediaItems = List.of(
+                TrendMediaItem.builder().type("image").url("https://cdn.example.com/cover.jpg").build(),
+                TrendMediaItem.builder().type("image").url("https://cdn.example.com/body.jpg").build(),
+                TrendMediaItem.builder().type("video").url("https://cdn.example.com/video.mp4").build()
+        );
+
+        String markdownImage = service.pickMarkdownImage(mediaItems, "https://cdn.example.com/cover.jpg");
+
+        assertEquals("https://cdn.example.com/body.jpg", markdownImage);
     }
 
     @Test
