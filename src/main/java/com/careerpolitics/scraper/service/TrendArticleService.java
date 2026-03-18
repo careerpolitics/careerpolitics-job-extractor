@@ -71,6 +71,9 @@ public class TrendArticleService {
     @Value("${careerpolitics.content.article-api.token:}")
     private String articleApiToken;
 
+    @Value("${careerpolitics.content.article-api.organization-id:}")
+    private Long articleApiOrganizationId;
+
 
     public List<String> discoverTrends(String geo, String language, int maxTrends, List<String> fallbackTrends) {
         List<String> cleanedFallbackTrends = fallbackTrends != null
@@ -120,8 +123,22 @@ public class TrendArticleService {
                                               String trend,
                                               List<TrendNewsItem> newsItems,
                                               String coverImage,
-                                              boolean publish) {
-        return publishToCareerPolitics(title, markdown, tags, trend, newsItems, coverImage, publish);
+                                              boolean publish,
+                                              String requestArticleApiToken,
+                                              Long requestOrganizationId) {
+        return publishToCareerPolitics(title, markdown, tags, trend, newsItems, coverImage, publish, requestArticleApiToken, requestOrganizationId);
+    }
+
+    public String prepareMarkdownForPublishing(String markdown, String coverImage) {
+        String safeMarkdown = markdown == null ? "" : markdown;
+        if (coverImage == null || coverImage.isBlank()) {
+            return safeMarkdown.trim();
+        }
+
+        String normalizedCoverImage = java.util.regex.Pattern.quote(coverImage.trim());
+        String withoutMarkdownImage = safeMarkdown.replaceAll("(?im)^\\s*!\\[[^\\]]*]\\(" + normalizedCoverImage + "\\)\\s*\\r?\\n?", "");
+        String withoutHtmlImage = withoutMarkdownImage.replaceAll("(?is)<img[^>]*src\\s*=\\s*[\"\']" + normalizedCoverImage + "[\"\'][^>]*>\\s*", "");
+        return withoutHtmlImage.trim();
     }
 
     public List<String> pickDefaultTagsForTrend(String trend) {
@@ -491,10 +508,9 @@ public class TrendArticleService {
                 
                 Adapt naturally, but generally include:
                 
-                1. Cover Image (if provided)
-                2. SEO Optimized Title
-                3. Introduction — explain what happened and why aspirants care
-                4. Key Developments
+                1. SEO Optimized Title
+                2. Introduction — explain what happened and why aspirants care
+                3. Key Developments
                 5. Why This Topic Is Trending
                 6. Timeline of Events (if relevant)
                 7. Impact on Aspirants
@@ -504,6 +520,8 @@ public class TrendArticleService {
                 11. Conclusion with actionable advice
                 12. Sources
                 13. Media Embeds
+
+                Do not embed the cover image inside the markdown when a cover image URL is provided. The publishing API will receive it separately as the cover/main image.
                 
                 ---
                 
@@ -597,7 +615,7 @@ public class TrendArticleService {
         }
     }
 
-    Map<String, Object> publishToCareerPolitics(String title, String markdown, List<String> tags, String trend, List<TrendNewsItem> newsItems, String coverImage, boolean published) {
+    Map<String, Object> publishToCareerPolitics(String title, String markdown, List<String> tags, String trend, List<TrendNewsItem> newsItems, String coverImage, boolean published, String requestArticleApiToken, Long requestOrganizationId) {
         if (articleApiUrl == null || articleApiUrl.isBlank()) {
             return Map.of(
                     "success", false,
@@ -607,8 +625,10 @@ public class TrendArticleService {
         }
 
         List<String> safeTags = sanitizeTags(tags);
-        String safeMarkdown = markdown == null ? "" : markdown;
+        String safeMarkdown = prepareMarkdownForPublishing(markdown, coverImage);
         String description = buildDescription(trend, newsItems);
+        String effectiveArticleApiToken = firstNonBlank(requestArticleApiToken, articleApiToken);
+        Long effectiveOrganizationId = requestOrganizationId != null ? requestOrganizationId : articleApiOrganizationId;
 
         Map<String, Object> payload = new LinkedHashMap<>();
         Map<String, Object> articlePayload = new LinkedHashMap<>();
@@ -621,6 +641,9 @@ public class TrendArticleService {
             articlePayload.put("main_image", coverImage);
         }
         payload.put("article", articlePayload);
+        if (effectiveOrganizationId != null) {
+            payload.put("organization_id", effectiveOrganizationId);
+        }
         payload.put("meta", Map.of(
                 "source", "google-trends-plus-google-search",
                 "trend", trend,
@@ -628,8 +651,8 @@ public class TrendArticleService {
         ));
 
         WebClient.Builder builder = WebClient.builder();
-        if (articleApiToken != null && !articleApiToken.isBlank()) {
-            builder.defaultHeader("api-key", articleApiToken);
+        if (effectiveArticleApiToken != null && !effectiveArticleApiToken.isBlank()) {
+            builder.defaultHeader("api-key", effectiveArticleApiToken);
         }
 
         try {
