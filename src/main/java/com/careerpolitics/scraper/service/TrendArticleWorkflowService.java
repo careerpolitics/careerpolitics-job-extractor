@@ -82,6 +82,7 @@ public class TrendArticleWorkflowService {
                 stepErrors.add("media_fetch_warning: no media extracted for trend=" + trend);
             }
             String coverImage = mediaBundle.coverImage();
+            String markdownImage = mediaBundle.markdownImage();
 
             Map<String, Object> articleData;
             try {
@@ -90,12 +91,13 @@ public class TrendArticleWorkflowService {
                         newsItems,
                         mediaItems,
                         coverImage,
+                        markdownImage,
                         request.getLanguage()
                 );
             } catch (Exception ex) {
                 stepErrors.add("article_generation_failed: " + ex.getMessage());
                 workflowErrors.add("AI generation failed for trend " + trend + ": " + ex.getMessage());
-                articleData = fallbackArticleData(trend, newsItems, coverImage);
+                articleData = fallbackArticleData(trend, newsItems, markdownImage);
             }
 
             @SuppressWarnings("unchecked")
@@ -111,7 +113,10 @@ public class TrendArticleWorkflowService {
             String title = String.valueOf(
                     articleData.getOrDefault("title", trend + " - Latest Jobs & Education Update")
             );
-            String markdown = String.valueOf(articleData.getOrDefault("markdown", ""));
+            String markdown = trendArticleService.attachMarkdownImage(
+                    String.valueOf(articleData.getOrDefault("markdown", "")),
+                    markdownImage
+            );
 
             boolean requestedPublished = request.shouldPublish();
             Map<String, Object> publishResponse = trendArticleService.publishArticle(
@@ -121,7 +126,9 @@ public class TrendArticleWorkflowService {
                     trend,
                     newsItems,
                     coverImage,
-                    requestedPublished
+                    requestedPublished,
+                    request.getArticleApiToken(),
+                    request.getOrganizationId()
             );
             boolean published = requestedPublished && Boolean.TRUE.equals(publishResponse.get("success"));
             if (!Boolean.TRUE.equals(publishResponse.get("success"))) {
@@ -171,11 +178,8 @@ public class TrendArticleWorkflowService {
 
     private Map<String, Object> fallbackArticleData(String trend,
                                                     List<TrendNewsItem> newsItems,
-                                                    String coverImage) {
+                                                    String markdownImage) {
         StringBuilder markdown = new StringBuilder();
-        if (coverImage != null && !coverImage.isBlank()) {
-            markdown.append("![Cover](").append(coverImage).append(")\n\n");
-        }
         markdown.append("## ").append(trend).append(" - Update\n\n");
         markdown.append("We could not generate full AI article content right now. Here are the latest collected details.\n\n");
         for (TrendNewsItem item : newsItems) {
@@ -188,7 +192,7 @@ public class TrendArticleWorkflowService {
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("title", trend + " - Latest Jobs & Education Update");
-        result.put("markdown", markdown.toString());
+        result.put("markdown", trendArticleService.attachMarkdownImage(markdown.toString(), markdownImage));
         result.put("tags", trendArticleService.pickDefaultTagsForTrend(trend));
         result.put("keywords", trendArticleService.pickDefaultKeywordsForTrend(trend));
         return result;

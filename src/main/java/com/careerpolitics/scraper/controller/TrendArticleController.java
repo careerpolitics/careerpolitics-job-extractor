@@ -101,8 +101,9 @@ public class TrendArticleController {
             @ApiResponse(responseCode = "500", description = "Generation or publishing failed")
     })
     public ResponseEntity<TrendArticleResponse> createTrendingArticle(@Valid @RequestBody TrendArticleRequest request) {
-        log.info("Trend article request received: geo={}, language={}, maxTrends={}, maxNewsPerTrend={}, publish={}",
-                request.getGeo(), request.getLanguage(), request.getMaxTrends(), request.getMaxNewsPerTrend(), request.shouldPublish());
+        log.info("Trend article request received: geo={}, language={}, maxTrends={}, maxNewsPerTrend={}, publish={}, organizationId={}, requestTokenPresent={}",
+                request.getGeo(), request.getLanguage(), request.getMaxTrends(), request.getMaxNewsPerTrend(), request.shouldPublish(),
+                request.getOrganizationId(), request.getArticleApiToken() != null && !request.getArticleApiToken().isBlank());
 
         TrendArticleResponse response = trendArticleWorkflowService.createAndOptionallyPublish(request);
         log.info("Trend article request completed: trends={}, generatedArticles={}",

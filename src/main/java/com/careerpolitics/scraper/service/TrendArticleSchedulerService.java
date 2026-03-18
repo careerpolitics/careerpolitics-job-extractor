@@ -40,6 +40,9 @@ public class TrendArticleSchedulerService {
     @Value("${careerpolitics.content.trends.scheduler.fallback-trends:}")
     private List<String> fallbackTrends;
 
+    @Value("${careerpolitics.content.article-api.organization-id:}")
+    private Long organizationId;
+
     public TrendArticleSchedulerService(TrendArticleWorkflowService trendArticleWorkflowService) {
         this.trendArticleWorkflowService = trendArticleWorkflowService;
     }
@@ -84,6 +87,7 @@ public class TrendArticleSchedulerService {
         request.setFallbackTrends(
                 fallbackTrends == null || fallbackTrends.isEmpty() ? null : fallbackTrends
         );
+        request.setOrganizationId(organizationId);
         return request;
     }
 }

@@ -63,6 +63,7 @@ careerpolitics:
     article-api:
       url: ${CAREERPOLITICS_ARTICLE_API_URL:https://careerpolitics.com/api/articles}
       token: ${CAREERPOLITICS_ARTICLE_API_TOKEN:}
+      organization-id: ${CAREERPOLITICS_ARTICLE_ORGANIZATION_ID:}
     trends:
       scheduler:
         enabled: ${TRENDS_SCHEDULER_ENABLED:false}
