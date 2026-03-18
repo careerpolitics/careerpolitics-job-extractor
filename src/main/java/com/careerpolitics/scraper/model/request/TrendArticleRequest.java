@@ -1,5 +1,7 @@
 package com.careerpolitics.scraper.model.request;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -38,6 +40,14 @@ public class TrendArticleRequest {
 
     @Schema(description = "Fallback trend keywords used if Google Trends is unavailable")
     private List<String> fallbackTrends;
+
+    @JsonAlias("CAREERPOLITICS_ARTICLE_API_TOKEN")
+    @Schema(description = "Article API token used only for this API request when publish=true. Cron jobs continue using configured properties.", example = "cp_live_xxx")
+    private String articleApiToken;
+
+    @JsonProperty("organization_id")
+    @Schema(description = "Optional organization id to include while publishing. API callers can override it per request; automated jobs use configured properties when present.", example = "42")
+    private Long organizationId;
 
     public boolean shouldPublish() {
         return Boolean.TRUE.equals(publish);
