@@ -97,7 +97,7 @@ public class TrendingWorkflowService {
         }
 
         if (allHeadlines.isEmpty()) {
-            warnings.add("No headlines were returned from Google News RSS. Articles were generated using trend-only fallback content.");
+            warnings.add("No headlines were returned from the Selenium Google News workflow. Articles were generated using trend-only fallback content.");
         }
 
         return new TrendingArticleResponse(selectedTrends, deduplicateHeadlines(allHeadlines), articles, warnings);

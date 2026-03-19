@@ -14,23 +14,37 @@ import java.util.List;
 public record TrendingProperties(
         Discovery discovery,
         News news,
+        Selenium selenium,
         Generation generation,
         Publishing publishing,
         Scheduler scheduler
 ) {
 
     public record Discovery(
-            @NotBlank String googleTrendsRssUrl,
+            @NotBlank String googleTrendsUrl,
             @Min(1) @Max(50) int defaultMaxTrends,
             List<String> fallbackTrends
     ) {
     }
 
     public record News(
-            @NotBlank String googleNewsRssUrl,
-            @Min(1) @Max(20) int defaultMaxNewsPerTrend,
-            Duration connectTimeout,
-            Duration readTimeout
+            @NotBlank String googleSearchUrl,
+            @Min(1) @Max(20) int defaultMaxNewsPerTrend
+    ) {
+    }
+
+    public record Selenium(
+            boolean enabled,
+            boolean newsEnabled,
+            boolean headless,
+            boolean manualVerificationWaitEnabled,
+            @Min(10) @Max(300) int manualVerificationMaxWaitSeconds,
+            @Min(5) @Max(120) int timeoutSeconds,
+            @Min(1) @Max(5) int maxAttempts,
+            @Min(100) @Max(5000) int interactionDelayMs,
+            String remoteUrl,
+            List<String> proxyPool,
+            Duration sessionRetryBackoff
     ) {
     }
 

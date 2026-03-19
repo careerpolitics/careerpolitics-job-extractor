@@ -14,9 +14,10 @@
   - `model`: immutable trend, headline, article, and publish result records.
   - `port`: interfaces for discovery, news lookup, generation, publishing, and history storage.
   - `request` / `response`: API contracts.
-- `infrastructure/google`
-  - `GoogleTrendsRssClient`: Google Trends RSS adapter.
-  - `GoogleNewsRssClient`: Google News RSS adapter.
+- `infrastructure/selenium`
+  - `SeleniumBrowserClient`: bounded remote-browser loader with reduced interaction logic.
+  - `GoogleTrendsSeleniumClient`: Google Trends adapter.
+  - `GoogleNewsSeleniumClient`: Google Search News adapter.
 - `infrastructure/article`
   - `TemplateArticleGenerator`: default low-cost article generation strategy.
   - `OpenRouterArticleGenerator`: optional AI strategy.
@@ -31,31 +32,28 @@
 - **Service Layer**: `TrendingWorkflowService` coordinates the use case and keeps controllers thin.
 - **Strategy**: `ArticleGenerator` supports template and OpenRouter implementations.
 - **Factory**: `ArticleGeneratorFactory` selects the correct generator based on configuration.
-- **Ports and Adapters**: external systems are isolated behind interfaces to reduce coupling.
+- **Ports and Adapters**: Selenium, publishing, and persistence are isolated behind interfaces.
 
-## CPU bottlenecks identified and fixed
+## CPU bottlenecks identified and mitigated
 
-The original implementation used browser automation for trends and news scraping. That design was expensive because it combined:
+Selenium remains the required scraping mechanism, so the refactor focuses on reducing the known hotspots instead of removing the browser:
 
-- Selenium Chrome sessions inside Docker.
-- Repeated retry loops around browser startup and scraping.
-- Manual verification wait loops for anti-bot pages.
-- Consent handling, scrolling, and DOM polling.
-
-The refactor removes the browser entirely and replaces it with RSS and lightweight HTTP calls. This drops CPU usage sharply and also removes the need for a second Selenium container.
+- Browser startup retries are capped.
+- Interaction logic is reduced to light scrolling instead of aggressive simulated browsing.
+- Manual bot-verification waits are disabled by default.
+- Scheduler overlap is blocked with an `AtomicBoolean`.
+- Chrome and app containers are both CPU and memory constrained in Docker.
 
 ## Additional production-readiness improvements
 
 - Lower default log verbosity and disabled Hibernate SQL spam.
-- Graceful scheduler overlap protection with `AtomicBoolean`.
 - Centralized exception handling with `ProblemDetail`.
-- Configurable publishing, OpenRouter generation, scheduler cadence, and database pool sizing.
+- Configurable Selenium, publishing, OpenRouter generation, scheduler cadence, and database pool sizing.
 - Graceful shutdown enabled in `application.yaml`.
 
 ## Docker optimization suggestions
 
-- Keep container CPU limited to `1.0` unless benchmarking proves more is needed.
-- Keep memory in the `512M`-`768M` range for the application container.
-- Use `G1GC`, `MaxRAMPercentage`, and `InitialRAMPercentage` as configured in `docker-compose.yaml` and `build.gradle`.
-- Keep the scheduler disabled by default and prefer six-hour or slower intervals.
-- If article generation with OpenRouter is enabled, prefer request timeouts and small trend batches.
+- Keep Selenium sessions at one concurrent browser in the standalone container.
+- Prefer `SELENIUM_HEADLESS=true` in production.
+- Keep `SELENIUM_MAX_ATTEMPTS` at `1` or `2`.
+- Keep scheduler cadence at six hours or slower unless a tighter SLA is required.

@@ -39,7 +39,7 @@ public class TemplateArticleGenerator implements ArticleGenerator {
         builder.append("## Trend summary\n\n");
         builder.append(trend).append(" is currently showing strong momentum in Google Trends for language ")
                 .append(language)
-                .append(". This lightweight article is generated from live RSS feeds so it remains stable in production and inexpensive to run.\n\n");
+                .append(". This lightweight article is generated from live Selenium-collected trend and headline data so it remains aligned with the current browser workflow.\n\n");
 
         builder.append("## Why it is trending\n\n");
         if (headlines.isEmpty()) {
