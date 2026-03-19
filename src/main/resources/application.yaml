@@ -54,8 +54,8 @@ careerpolitics:
     scheduler:
       enabled: ${TRENDING_SCHEDULER_ENABLED:false}
       cron: ${TRENDING_SCHEDULER_CRON:0 0 */6 * * *}
-      geo: ${TRENDING_SCHEDULER_GEO:US}
-      language: ${TRENDING_SCHEDULER_LANGUAGE:en-US}
+      geo: ${TRENDING_SCHEDULER_GEO:IN}
+      language: ${TRENDING_SCHEDULER_LANGUAGE:en-IN}
       max-trends: ${TRENDING_SCHEDULER_MAX_TRENDS:3}
       max-news-per-trend: ${TRENDING_SCHEDULER_MAX_NEWS_PER_TREND:4}
       trend-cooldown-hours: ${TRENDING_SCHEDULER_TREND_COOLDOWN_HOURS:24}

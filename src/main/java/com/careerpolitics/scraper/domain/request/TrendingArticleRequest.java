@@ -11,9 +11,9 @@ import java.util.List;
 @Data
 public class TrendingArticleRequest {
 
-    private String geo = "US";
+    private String geo = "IN";
 
-    private String language = "en-US";
+    private String language = "en-IN";
 
     @Min(1)
     @Max(24)

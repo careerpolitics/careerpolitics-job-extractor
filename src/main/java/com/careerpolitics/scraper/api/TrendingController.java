@@ -30,8 +30,8 @@ public class TrendingController {
     @GetMapping("/trends")
     @Operation(summary = "Discover current trends", description = "Loads Google Trends via Selenium and returns normalized trend terms.")
     public ResponseEntity<TrendDiscoveryResponse> discoverTrends(
-            @RequestParam(defaultValue = "US") String geo,
-            @RequestParam(defaultValue = "en-US") String language,
+            @RequestParam(defaultValue = "IN") String geo,
+            @RequestParam(defaultValue = "en-IN") String language,
             @RequestParam(defaultValue = "5") int maxTrends
     ) {
         return ResponseEntity.ok(new TrendDiscoveryResponse(
@@ -46,8 +46,8 @@ public class TrendingController {
     @Operation(summary = "Discover trend news", description = "Loads Google Search news results via Selenium for a single trend term.")
     public ResponseEntity<TrendNewsResponse> discoverNews(
             @RequestParam String trend,
-            @RequestParam(defaultValue = "US") String geo,
-            @RequestParam(defaultValue = "en-US") String language,
+            @RequestParam(defaultValue = "IN") String geo,
+            @RequestParam(defaultValue = "en-IN") String language,
             @RequestParam(defaultValue = "4") int maxNewsPerTrend
     ) {
         return ResponseEntity.ok(new TrendNewsResponse(
