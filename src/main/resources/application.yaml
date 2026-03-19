@@ -1,115 +1,101 @@
 spring:
   application:
-    name: careerpolitics-scraper
-
+    name: careerpolitics-trending-service
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/careerpoliticsdb}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
     password: ${SPRING_DATASOURCE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 3
-      minimum-idle: 1
-
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:4}
+      minimum-idle: ${DB_POOL_MIN_IDLE:1}
   jpa:
     hibernate:
-      ddl-auto: update   # creates/updates schema automatically
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: true
-    show-sql: true
+      ddl-auto: update
+    open-in-view: false
+    show-sql: false
+  jackson:
+    default-property-inclusion: non_null
 
-
-  sql:
-    init:
-      mode: always
-      continue-on-error: true
-      data-locations: classpath:data.sql
-      defer-datasource-initialization: true   # 🚀 important: run data.sql after Hibernate
-
-# CareerPolitics Configuration
 careerpolitics:
-  scraper:
-    base-url: https://www.sarkariexam.com
-    batch-size: 5
-    delay-ms: 1000
-    max-retries: 3
-    timeout-ms: 10000
-    user-agent: CareerPolitics-Scraper/1.0
-  storage:
-    s3-bucket: careerpolitics-job-images
-    image-quality: 85
-    max-image-size-kb: 500
-  content:
-    google-trends-url: https://trends.google.com/trending
-    google-search-url: https://www.google.com/search
-    youtube-rss-url: https://www.youtube.com/feeds/videos.xml
+  trending:
+    discovery:
+      google-trends-url: ${GOOGLE_TRENDS_URL:https://trends.google.com/trending}
+      default-max-trends: ${TRENDING_DEFAULT_MAX_TRENDS:5}
+      fallback-trends: ${TRENDING_FALLBACK_TRENDS:}
+    news:
+      google-search-url: ${GOOGLE_SEARCH_URL:https://www.google.com/search}
+      default-max-news-per-trend: ${TRENDING_DEFAULT_MAX_NEWS_PER_TREND:4}
     selenium:
       enabled: ${SELENIUM_ENABLED:true}
       news-enabled: ${SELENIUM_NEWS_ENABLED:true}
-      headless: ${SELENIUM_HEADLESS:false}
-      manual-verification-wait-enabled: ${SELENIUM_MANUAL_VERIFICATION_WAIT_ENABLED:true}
-      manual-verification-max-wait-seconds: ${SELENIUM_MANUAL_VERIFICATION_MAX_WAIT_SECONDS:180}
+      headless: ${SELENIUM_HEADLESS:true}
+      manual-verification-wait-enabled: ${SELENIUM_MANUAL_VERIFICATION_WAIT_ENABLED:false}
+      manual-verification-max-wait-seconds: ${SELENIUM_MANUAL_VERIFICATION_MAX_WAIT_SECONDS:45}
       timeout-seconds: ${SELENIUM_TIMEOUT_SECONDS:20}
       max-attempts: ${SELENIUM_MAX_ATTEMPTS:2}
-      proxy-pool: ${SELENIUM_PROXY_POOL:}
+      interaction-delay-ms: ${SELENIUM_INTERACTION_DELAY_MS:750}
       remote-url: ${SELENIUM_REMOTE_URL:http://selenium:4444/wd/hub}
-    ai:
-      openrouter:
-        base-url: https://openrouter.ai/api/v1
-        model: anthropic/claude-3.5-sonnet
-        api-key: ${OPENROUTER_API_KEY:}
-    article-api:
-      url: ${CAREERPOLITICS_ARTICLE_API_URL:https://careerpolitics.com/api/articles}
-      token: ${CAREERPOLITICS_ARTICLE_API_TOKEN:}
+      user-agent: ${SELENIUM_USER_AGENT:}
+      proxy-pool: ${SELENIUM_PROXY_POOL:}
+      session-retry-backoff: ${SELENIUM_SESSION_RETRY_BACKOFF:2s}
+    generation:
+      open-router-enabled: ${OPENROUTER_ENABLED:false}
+      open-router-base-url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api/v1}
+      open-router-model: ${OPENROUTER_MODEL:openai/gpt-4o-mini}
+      open-router-api-key: ${OPENROUTER_API_KEY:}
+      timeout: ${OPENROUTER_TIMEOUT:20s}
+    publishing:
+      enabled: ${CAREERPOLITICS_PUBLISHING_ENABLED:false}
+      article-api-url: ${CAREERPOLITICS_ARTICLE_API_URL:}
+      article-api-token: ${CAREERPOLITICS_ARTICLE_API_TOKEN:}
       organization-id: ${CAREERPOLITICS_ARTICLE_ORGANIZATION_ID:}
-    trends:
-      scheduler:
-        enabled: ${TRENDS_SCHEDULER_ENABLED:false}
-        cron: ${TRENDS_SCHEDULER_CRON:0 0 * * * *}
-        geo: ${TRENDS_SCHEDULER_GEO:IN}
-        language: ${TRENDS_SCHEDULER_LANGUAGE:en-US}
-        max-trends: ${TRENDS_SCHEDULER_MAX_TRENDS:3}
-        max-news-per-trend: ${TRENDS_SCHEDULER_MAX_NEWS_PER_TREND:3}
-        trend-cooldown-hours: ${TRENDS_SCHEDULER_TREND_COOLDOWN_HOURS:48}
-        publish: ${TRENDS_SCHEDULER_PUBLISH:true}
-        fallback-trends: ${TRENDS_SCHEDULER_FALLBACK_TRENDS:}
+      timeout: ${CAREERPOLITICS_ARTICLE_API_TIMEOUT:10s}
+    scheduler:
+      enabled: ${TRENDING_SCHEDULER_ENABLED:false}
+      cron: ${TRENDING_SCHEDULER_CRON:0 0 */6 * * *}
+      geo: ${TRENDING_SCHEDULER_GEO:IN}
+      language: ${TRENDING_SCHEDULER_LANGUAGE:en-IN}
+      max-trends: ${TRENDING_SCHEDULER_MAX_TRENDS:3}
+      max-news-per-trend: ${TRENDING_SCHEDULER_MAX_NEWS_PER_TREND:4}
+      trend-cooldown-hours: ${TRENDING_SCHEDULER_TREND_COOLDOWN_HOURS:24}
+      publish: ${TRENDING_SCHEDULER_PUBLISH:false}
 
-# API Documentation
+
 api:
-  title: CareerPolitics Job Scraper API
-  description: REST API for government job scraping and management
+  title: CareerPolitics Trending Service API
+  description: Swagger-enabled API for Selenium-based trending article workflows
   version: 1.0.0
   contact:
     name: CareerPolitics Team
     email: support@careerpolitics.com
     url: https://careerpolitics.com
 
-# Monitoring
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui/index.html
+    operations-sorter: method
+    tags-sorter: alpha
+
 management:
   endpoints:
     web:
       exposure:
-        include: health, metrics, info
+        include: health,info,metrics
   endpoint:
     health:
-      show-details: always
-  info:
-    env:
-      enabled: true
+      show-details: never
 
-# Logging
 logging:
   level:
-    com.careerpolitics: DEBUG
-    org.springframework.web: INFO
-    org.hibernate.SQL: DEBUG
-  file:
-    name: logs/careerpolitics-scraper.log
+    com.careerpolitics.scraper: INFO
+    org.springframework.web.client: WARN
+    org.hibernate.SQL: WARN
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
-    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss} %-5level [%thread] %logger{36} - %msg%n"
 
 server:
   port: ${PORT:8080}
+  shutdown: graceful

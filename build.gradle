@@ -8,6 +8,12 @@ plugins {
 group = 'com.careerpolitics.scraper'
 version = '1.0-SNAPSHOT'
 
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
 configurations {
     compileOnly {
         extendsFrom annotationProcessor
@@ -22,42 +28,18 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
-    implementation 'org.springframework.boot:spring-boot-starter-cache'
-    implementation 'org.springframework.boot:spring-boot-starter-webflux'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
     runtimeOnly 'org.postgresql:postgresql'
 
-    implementation 'org.jsoup:jsoup:1.17.1'
-    implementation 'de.l3s.boilerpipe:boilerpipe:1.1.0'
-    implementation 'xerces:xercesImpl:2.12.2'
-    implementation 'net.sourceforge.nekohtml:nekohtml:1.9.22'
-
+    implementation 'org.jsoup:jsoup:1.17.2'
     implementation 'org.seleniumhq.selenium:selenium-java:4.27.0'
-    implementation 'io.github.bonigarcia:webdrivermanager:5.9.2'
-
-    implementation platform('software.amazon.awssdk:bom:2.20.0')
-    implementation 'software.amazon.awssdk:s3'
-    implementation 'software.amazon.awssdk:sts'
-
-    implementation 'org.imgscalr:imgscalr-lib:4.2'
-
-    implementation 'io.github.resilience4j:resilience4j-spring-boot2:2.1.0'
-    implementation 'io.github.resilience4j:resilience4j-reactor:2.1.0'
-
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.2.0'
-
-    implementation 'org.apache.commons:commons-lang3:3.13.0'
-    implementation 'commons-io:commons-io:2.14.0'
-    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-xml:2.15.3'
-    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.15.3'
 
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testImplementation 'io.projectreactor:reactor-test'
-    testImplementation 'org.testcontainers:postgresql:1.19.3'
 }
 
 tasks.named('test') {
@@ -65,21 +47,27 @@ tasks.named('test') {
 }
 
 tasks.named('bootJar') {
-    archiveFileName = 'careerpolitics-job-scraper.jar'
+    archiveFileName = 'careerpolitics-trending-service.jar'
 }
 
 jib {
     from {
-        image = "eclipse-temurin:21-jre"
+        image = 'eclipse-temurin:21-jre'
     }
     to {
-        image = System.getenv('IMAGE_NAME') ?: "muraridevv/careerpolitics-job-scraper"
+        image = System.getenv('IMAGE_NAME') ?: 'muraridevv/careerpolitics-trending-service'
         tags = [System.getenv('IMAGE_TAG') ?: project.version.toString()] as Set
     }
     container {
         mainClass = 'com.careerpolitics.scraper.CareerPoliticsScraperApplication'
         ports = ['8080']
-        jvmFlags = ['-XX:+UseContainerSupport', '-XX:MaxRAMPercentage=75.0']
+        jvmFlags = [
+                '-XX:+UseContainerSupport',
+                '-XX:MaxRAMPercentage=70.0',
+                '-XX:InitialRAMPercentage=25.0',
+                '-XX:+UseG1GC',
+                '-XX:MaxGCPauseMillis=200'
+        ]
         creationTime = 'USE_CURRENT_TIMESTAMP'
     }
 }
