@@ -43,6 +43,11 @@ The original browser-driven implementation was CPU-heavy because it used large s
 - `GET /api/trending/news?trend=...`
 - `POST /api/trending/articles`
 
+## Swagger UI
+
+- Open `http://localhost:8080/swagger-ui/index.html` to browse and execute requests from the browser.
+- `/`, `/docs`, and `/swagger` redirect to Swagger UI for convenience.
+
 ## Recommended production settings
 
 - Keep `TRENDING_SCHEDULER_ENABLED=false` unless you need automated runs.

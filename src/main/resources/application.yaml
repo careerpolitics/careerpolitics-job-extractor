@@ -60,6 +60,24 @@ careerpolitics:
       trend-cooldown-hours: ${TRENDING_SCHEDULER_TREND_COOLDOWN_HOURS:24}
       publish: ${TRENDING_SCHEDULER_PUBLISH:false}
 
+
+api:
+  title: CareerPolitics Trending Service API
+  description: Swagger-enabled API for Selenium-based trending article workflows
+  version: 1.0.0
+  contact:
+    name: CareerPolitics Team
+    email: support@careerpolitics.com
+    url: https://careerpolitics.com
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui/index.html
+    operations-sorter: method
+    tags-sorter: alpha
+
 management:
   endpoints:
     web:

@@ -4,6 +4,7 @@
 
 - `api`
   - `TrendingController`: thin HTTP layer for trend discovery, headline discovery, and article generation.
+  - `SwaggerRedirectController`: redirects browser traffic to Swagger UI.
   - `ApiExceptionHandler`: consistent Problem Details responses.
 - `application`
   - `TrendingWorkflowService`: orchestrates the end-to-end trending pipeline.
@@ -48,6 +49,7 @@ Selenium remains the required scraping mechanism, so the refactor focuses on red
 
 - Lower default log verbosity and disabled Hibernate SQL spam.
 - Centralized exception handling with `ProblemDetail`.
+- Swagger/OpenAPI UI restored so the REST API can be explored and executed directly in the browser.
 - Configurable Selenium, publishing, OpenRouter generation, scheduler cadence, and database pool sizing.
 - Graceful shutdown enabled in `application.yaml`.
 
