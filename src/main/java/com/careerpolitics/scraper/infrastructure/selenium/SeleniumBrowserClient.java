@@ -49,6 +49,12 @@ public class SeleniumBrowserClient {
             }
             """;
 
+    private static final By BOT_CHALLENGE_SELECTOR = By.cssSelector(
+            "form[action*='sorry'], form#captcha-form, iframe[src*='recaptcha'], iframe[title*='reCAPTCHA'], "
+                    + "iframe[src*='captcha'], iframe[src*='sorry'], textarea[g-recaptcha-response], "
+                    + "div.g-recaptcha, div.h-captcha, #recaptcha, input[name='captcha']"
+    );
+
     private final TrendingProperties properties;
     private final Random random = new Random();
 
@@ -267,22 +273,59 @@ public class SeleniumBrowserClient {
         }
     }
 
-    private boolean isBotCheckPage(WebDriver driver) {
+    boolean isBotCheckPage(WebDriver driver) {
         try {
-            String title = String.valueOf(driver.getTitle()).toLowerCase(Locale.ROOT);
-            String body = String.valueOf(driver.getPageSource()).toLowerCase(Locale.ROOT);
-            boolean hasCaptcha = !driver.findElements(By.cssSelector(
-                    "iframe[src*='captcha'], iframe[src*='sorry'], textarea[g-recaptcha-response], div.g-recaptcha, div.h-captcha"
-            )).isEmpty();
-            return hasCaptcha
-                    || title.contains("unusual traffic")
-                    || title.contains("captcha")
-                    || body.contains("verify you are human")
-                    || body.contains("our systems have detected unusual traffic")
-                    || body.contains("i'm not a robot");
+            return looksLikeBotCheck(
+                    driver.getCurrentUrl(),
+                    driver.getTitle(),
+                    extractVisibleText(driver),
+                    hasBotChallengeElement(driver)
+            );
         } catch (Exception exception) {
             return false;
         }
+    }
+
+    boolean looksLikeBotCheck(String currentUrl, String title, String visibleText, boolean hasChallengeElement) {
+        if (hasChallengeElement) {
+            return true;
+        }
+        String normalizedUrl = safeLower(currentUrl);
+        String normalizedTitle = safeLower(title);
+        String normalizedText = safeLower(visibleText);
+
+        if (normalizedUrl.contains("/sorry/") || normalizedUrl.contains("sorry/index") || normalizedUrl.contains("recaptcha")) {
+            return true;
+        }
+
+        if (normalizedTitle.contains("unusual traffic")
+                || normalizedTitle.contains("recaptcha")
+                || normalizedTitle.contains("verify you are human")) {
+            return true;
+        }
+
+        return normalizedText.contains("our systems have detected unusual traffic from your computer network")
+                || normalizedText.contains("to continue, please type the characters below")
+                || normalizedText.contains("press and hold")
+                || normalizedText.contains("verify you are human")
+                || normalizedText.contains("complete the security check to access")
+                || normalizedText.contains("i'm not a robot");
+    }
+
+    private boolean hasBotChallengeElement(WebDriver driver) {
+        return !driver.findElements(BOT_CHALLENGE_SELECTOR).isEmpty();
+    }
+
+    private String extractVisibleText(WebDriver driver) {
+        List<WebElement> bodies = driver.findElements(By.tagName("body"));
+        if (bodies.isEmpty()) {
+            return "";
+        }
+        return bodies.get(0).getText();
+    }
+
+    private String safeLower(String value) {
+        return value == null ? "" : value.toLowerCase(Locale.ROOT);
     }
 
     private List<String> sanitize(List<String> proxies) {

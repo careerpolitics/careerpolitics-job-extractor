@@ -39,7 +39,7 @@ class SeleniumBrowserClientTest {
     }
 
     @Test
-    void applyStealthFallsBackWithoutThrowingWhenCdpIsUnavailable() throws Exception {
+    void applyStealthFallsBackWithoutThrowingWhenCdpIsUnavailable() {
         SeleniumBrowserClient client = new SeleniumBrowserClient(properties(false, "http://192.168.0.100:4444/wd/hub", ""));
         RemoteWebDriver driver = org.mockito.Mockito.mock(RemoteWebDriver.class, org.mockito.Mockito.withSettings().extraInterfaces(org.openqa.selenium.JavascriptExecutor.class));
 
@@ -47,6 +47,48 @@ class SeleniumBrowserClientTest {
 
         org.mockito.Mockito.verify(driver).get("data:,");
         org.mockito.Mockito.verify((org.openqa.selenium.JavascriptExecutor) driver).executeScript(org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    void looksLikeBotCheckIsFalseForNormalGoogleResultsPageText() {
+        SeleniumBrowserClient client = new SeleniumBrowserClient(properties(false, "http://192.168.0.100:4444/wd/hub", ""));
+
+        boolean detected = client.looksLikeBotCheck(
+                "https://www.google.com/search?q=test&tbm=nws",
+                "test - Google Search",
+                "Top stories Example headline from Example News More results",
+                false
+        );
+
+        assertThat(detected).isFalse();
+    }
+
+    @Test
+    void looksLikeBotCheckIsTrueForGoogleSorryPageSignals() {
+        SeleniumBrowserClient client = new SeleniumBrowserClient(properties(false, "http://192.168.0.100:4444/wd/hub", ""));
+
+        boolean detected = client.looksLikeBotCheck(
+                "https://www.google.com/sorry/index?continue=https://www.google.com/search",
+                "Unusual Traffic from Your Computer Network",
+                "Our systems have detected unusual traffic from your computer network.",
+                false
+        );
+
+        assertThat(detected).isTrue();
+    }
+
+    @Test
+    void looksLikeBotCheckRequiresStrongSignalsInsteadOfGenericPageSourcePhrases() {
+        SeleniumBrowserClient client = new SeleniumBrowserClient(properties(false, "http://192.168.0.100:4444/wd/hub", ""));
+
+        boolean detected = client.looksLikeBotCheck(
+                "https://trends.google.com/trending",
+                "Google Trends",
+                "Welcome to Google Trends",
+                false
+        );
+
+        assertThat(detected).isFalse();
     }
 
     private TrendingProperties properties(boolean headless, String remoteUrl, String userAgent) {
