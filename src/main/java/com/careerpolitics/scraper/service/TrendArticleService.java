@@ -482,8 +482,8 @@ public class TrendArticleService {
                 
                 2. **At least 2 CTA blocks**
                 (after intro + before conclusion)
-                {%% cta https://example.com %%}
-                Join our Telegram for job alerts
+                {%% cta https://whatsapp.com/channel/0029Vb7b86cHFxP5FNrpK542 %%}
+                Join our Whatsapp Channel for job alerts
                 {%% endcta %%}
                 
                 3. **At least 2 DETAILS blocks**

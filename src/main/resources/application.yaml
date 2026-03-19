@@ -20,14 +20,6 @@ spring:
         format_sql: true
     show-sql: true
 
-
-  sql:
-    init:
-      mode: always
-      continue-on-error: true
-      data-locations: classpath:data.sql
-      defer-datasource-initialization: true   # 🚀 important: run data.sql after Hibernate
-
 # CareerPolitics Configuration
 careerpolitics:
   scraper:
