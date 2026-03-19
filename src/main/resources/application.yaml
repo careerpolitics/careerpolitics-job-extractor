@@ -36,6 +36,7 @@ careerpolitics:
       max-attempts: ${SELENIUM_MAX_ATTEMPTS:2}
       interaction-delay-ms: ${SELENIUM_INTERACTION_DELAY_MS:750}
       remote-url: ${SELENIUM_REMOTE_URL:http://selenium:4444/wd/hub}
+      user-agent: ${SELENIUM_USER_AGENT:}
       proxy-pool: ${SELENIUM_PROXY_POOL:}
       session-retry-backoff: ${SELENIUM_SESSION_RETRY_BACKOFF:2s}
     generation:

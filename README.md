@@ -31,6 +31,25 @@ The original browser-driven implementation was CPU-heavy because it used large s
 ./gradlew bootRun
 ```
 
+## Manual Selenium verification on a local Docker browser
+
+If Google presents a bot-check while you run the browser with `SELENIUM_HEADLESS=false`, expose Selenium's noVNC port and open:
+
+```
+http://localhost:7900/?autoconnect=1&resize=scale
+```
+
+Recommended local settings:
+
+```
+SELENIUM_HEADLESS=false
+SELENIUM_MANUAL_VERIFICATION_WAIT_ENABLED=true
+SELENIUM_MANUAL_VERIFICATION_MAX_WAIT_SECONDS=120
+SELENIUM_REMOTE_URL=http://localhost:4444/wd/hub
+```
+
+Leave `SELENIUM_USER_AGENT` unset unless you intentionally need to spoof a specific browser version.
+
 ## Tests
 
 ```bash

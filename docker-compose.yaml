@@ -27,8 +27,12 @@ services:
   selenium:
     image: selenium/standalone-chrome:127.0
     container_name: careerpolitics-selenium
+    ports:
+      - "4444:4444"
+      - "7900:7900"
     shm_size: 1g
     environment:
+      SE_VNC_NO_PASSWORD: 1
       SE_NODE_MAX_SESSIONS: 1
       SE_NODE_OVERRIDE_MAX_SESSIONS: false
       SE_SESSION_REQUEST_TIMEOUT: 120

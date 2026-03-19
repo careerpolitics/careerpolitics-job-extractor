@@ -43,6 +43,7 @@ public record TrendingProperties(
             @Min(1) @Max(5) int maxAttempts,
             @Min(100) @Max(5000) int interactionDelayMs,
             String remoteUrl,
+            String userAgent,
             List<String> proxyPool,
             Duration sessionRetryBackoff
     ) {

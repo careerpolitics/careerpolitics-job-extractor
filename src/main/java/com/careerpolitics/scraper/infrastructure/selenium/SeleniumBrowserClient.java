@@ -17,14 +17,12 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Random;
 
 @Slf4j
 @Component
 public class SeleniumBrowserClient {
-
-    private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-            + "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
     private final TrendingProperties properties;
     private final Random random = new Random();
@@ -93,16 +91,26 @@ public class SeleniumBrowserClient {
         return "";
     }
 
-    private ChromeOptions buildOptions(String proxy) {
+    ChromeOptions buildOptions(String proxy) {
         ChromeOptions options = new ChromeOptions();
         if (properties.selenium().headless()) {
-            options.addArguments("--headless=new");
+            options.addArguments("--headless=new", "--window-size=1600,1200");
+        } else {
+            options.addArguments("--start-maximized");
         }
-        options.addArguments("--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--window-size=1600,1200");
+        options.addArguments("--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--lang=en-US");
         options.addArguments("--disable-blink-features=AutomationControlled");
-        options.addArguments("--user-agent=" + USER_AGENT);
-        options.setExperimentalOption("excludeSwitches", List.of("enable-automation"));
+        options.setExperimentalOption("excludeSwitches", List.of("enable-automation", "enable-logging"));
         options.setExperimentalOption("useAutomationExtension", false);
+        options.setExperimentalOption("prefs", Map.of(
+                "intl.accept_languages", "en-US,en",
+                "credentials_enable_service", false,
+                "profile.password_manager_enabled", false
+        ));
+        String userAgent = properties.selenium().userAgent();
+        if (userAgent != null && !userAgent.isBlank()) {
+            options.addArguments("--user-agent=" + userAgent.trim());
+        }
         if (proxy != null && !proxy.isBlank()) {
             options.addArguments("--proxy-server=http://" + proxy);
         }
@@ -169,6 +177,12 @@ public class SeleniumBrowserClient {
             log.warn("Bot-check detected and manual verification is disabled.");
             return false;
         }
+        String noVncUrl = resolveNoVncUrl();
+        if (noVncUrl != null) {
+            log.warn("Bot-check detected. Complete verification in Selenium noVNC at {} within {} seconds.",
+                    noVncUrl,
+                    properties.selenium().manualVerificationMaxWaitSeconds());
+        }
         long deadline = System.currentTimeMillis() + properties.selenium().manualVerificationMaxWaitSeconds() * 1000L;
         while (System.currentTimeMillis() < deadline) {
             if (!isBotCheckPage(driver)) {
@@ -178,6 +192,22 @@ public class SeleniumBrowserClient {
         }
         log.warn("Timed out while waiting for Selenium bot verification.");
         return false;
+    }
+
+    String resolveNoVncUrl() {
+        if (properties.selenium().headless()) {
+            return null;
+        }
+        try {
+            URL remote = new URL(properties.selenium().remoteUrl());
+            String host = remote.getHost();
+            if (host == null || host.isBlank()) {
+                return null;
+            }
+            return "http://" + host + ":7900/?autoconnect=1&resize=scale";
+        } catch (Exception exception) {
+            return null;
+        }
     }
 
     private boolean isBotCheckPage(WebDriver driver) {
