@@ -294,22 +294,16 @@ public class SeleniumBrowserClient {
         String normalizedTitle = safeLower(title);
         String normalizedText = safeLower(visibleText);
 
-        if (normalizedUrl.contains("/sorry/") || normalizedUrl.contains("sorry/index") || normalizedUrl.contains("recaptcha")) {
+        if (normalizedUrl.contains("/sorry/") || normalizedUrl.contains("sorry/index")) {
             return true;
         }
 
-        if (normalizedTitle.contains("unusual traffic")
-                || normalizedTitle.contains("recaptcha")
-                || normalizedTitle.contains("verify you are human")) {
+        if (normalizedTitle.contains("unusual traffic")) {
             return true;
         }
 
         return normalizedText.contains("our systems have detected unusual traffic from your computer network")
-                || normalizedText.contains("to continue, please type the characters below")
-                || normalizedText.contains("press and hold")
-                || normalizedText.contains("verify you are human")
-                || normalizedText.contains("complete the security check to access")
-                || normalizedText.contains("i'm not a robot");
+                || normalizedText.contains("to continue, please type the characters below");
     }
 
     private boolean hasBotChallengeElement(WebDriver driver) {

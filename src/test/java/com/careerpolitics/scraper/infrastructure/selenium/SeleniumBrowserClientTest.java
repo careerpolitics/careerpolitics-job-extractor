@@ -77,6 +77,21 @@ class SeleniumBrowserClientTest {
         assertThat(detected).isTrue();
     }
 
+
+    @Test
+    void looksLikeBotCheckIsFalseForGenericVerifyTextWithoutChallengeSignals() {
+        SeleniumBrowserClient client = new SeleniumBrowserClient(properties(false, "http://192.168.0.100:4444/wd/hub", ""));
+
+        boolean detected = client.looksLikeBotCheck(
+                "https://www.google.com/search?q=test",
+                "Google Search",
+                "Verify you are human to continue reading this unrelated article",
+                false
+        );
+
+        assertThat(detected).isFalse();
+    }
+
     @Test
     void looksLikeBotCheckRequiresStrongSignalsInsteadOfGenericPageSourcePhrases() {
         SeleniumBrowserClient client = new SeleniumBrowserClient(properties(false, "http://192.168.0.100:4444/wd/hub", ""));
