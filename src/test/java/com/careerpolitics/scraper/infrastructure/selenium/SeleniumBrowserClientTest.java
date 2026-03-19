@@ -50,57 +50,42 @@ class SeleniumBrowserClientTest {
     }
 
     @Test
-    void looksLikeBotCheckIsFalseForNormalGoogleResultsPageText() {
+    void isLikelyBotCheckIsFalseForNormalGoogleResultsPageText() {
         SeleniumBrowserClient client = new SeleniumBrowserClient(properties(false, "http://192.168.0.100:4444/wd/hub", ""));
 
-        boolean detected = client.looksLikeBotCheck(
-                "https://www.google.com/search?q=test&tbm=nws",
-                "test - Google Search",
-                "Top stories Example headline from Example News More results",
-                false
+        boolean detected = client.isLikelyBotCheck(
+                "test - google search",
+                "top stories example headline from example news more results",
+                false,
+                true
         );
 
         assertThat(detected).isFalse();
     }
 
     @Test
-    void looksLikeBotCheckIsTrueForGoogleSorryPageSignals() {
+    void isLikelyBotCheckIsTrueForChallengeFrameWithoutNewsCards() {
         SeleniumBrowserClient client = new SeleniumBrowserClient(properties(false, "http://192.168.0.100:4444/wd/hub", ""));
 
-        boolean detected = client.looksLikeBotCheck(
-                "https://www.google.com/sorry/index?continue=https://www.google.com/search",
-                "Unusual Traffic from Your Computer Network",
-                "Our systems have detected unusual traffic from your computer network.",
+        boolean detected = client.isLikelyBotCheck(
+                "google search",
+                "verify you are human",
+                true,
                 false
         );
 
         assertThat(detected).isTrue();
     }
 
-
     @Test
-    void looksLikeBotCheckIsFalseForGenericVerifyTextWithoutChallengeSignals() {
+    void isLikelyBotCheckIsFalseWhenChallengeTextAppearsAlongsideNewsCards() {
         SeleniumBrowserClient client = new SeleniumBrowserClient(properties(false, "http://192.168.0.100:4444/wd/hub", ""));
 
-        boolean detected = client.looksLikeBotCheck(
-                "https://www.google.com/search?q=test",
-                "Google Search",
-                "Verify you are human to continue reading this unrelated article",
-                false
-        );
-
-        assertThat(detected).isFalse();
-    }
-
-    @Test
-    void looksLikeBotCheckRequiresStrongSignalsInsteadOfGenericPageSourcePhrases() {
-        SeleniumBrowserClient client = new SeleniumBrowserClient(properties(false, "http://192.168.0.100:4444/wd/hub", ""));
-
-        boolean detected = client.looksLikeBotCheck(
-                "https://trends.google.com/trending",
-                "Google Trends",
-                "Welcome to Google Trends",
-                false
+        boolean detected = client.isLikelyBotCheck(
+                "google search",
+                "verify you are human g-recaptcha latest headlines",
+                false,
+                true
         );
 
         assertThat(detected).isFalse();

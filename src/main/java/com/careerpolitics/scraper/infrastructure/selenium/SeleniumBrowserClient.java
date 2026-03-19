@@ -50,9 +50,7 @@ public class SeleniumBrowserClient {
             """;
 
     private static final By BOT_CHALLENGE_SELECTOR = By.cssSelector(
-            "form[action*='sorry'], form#captcha-form, iframe[src*='recaptcha'], iframe[title*='reCAPTCHA'], "
-                    + "iframe[src*='captcha'], iframe[src*='sorry'], textarea[g-recaptcha-response], "
-                    + "div.g-recaptcha, div.h-captcha, #recaptcha, input[name='captcha']"
+            "iframe[src*='recaptcha'], iframe[title*='challenge'], iframe[src*='sorry']"
     );
 
     private final TrendingProperties properties;
@@ -66,17 +64,17 @@ public class SeleniumBrowserClient {
         if (!properties.selenium().enabled()) {
             return "";
         }
-        return load(url, false);
+        return load(url, false, null);
     }
 
     public String fetchNewsPage(String url, String trend) {
         if (!properties.selenium().enabled() || !properties.selenium().newsEnabled()) {
             return "";
         }
-        return load(url, true);
+        return load(url, true, trend);
     }
 
-    private String load(String url, boolean newsMode) {
+    private String load(String url, boolean newsMode, String trend) {
         if (properties.selenium().remoteUrl() == null || properties.selenium().remoteUrl().isBlank()) {
             log.warn("Selenium remote URL is not configured. Returning empty page source.");
             return "";
@@ -99,7 +97,7 @@ public class SeleniumBrowserClient {
                     ensureNewsMode(driver, url);
                 }
                 performLightInteraction(driver);
-                if (!waitForBotCheck(driver)) {
+                if (newsMode && !waitForManualVerificationIfNeeded(driver, trend)) {
                     continue;
                 }
 
@@ -232,28 +230,37 @@ public class SeleniumBrowserClient {
         }
     }
 
-    private boolean waitForBotCheck(WebDriver driver) {
-        if (!isBotCheckPage(driver)) {
+    private boolean waitForManualVerificationIfNeeded(WebDriver driver, String trend) {
+        if (!isLikelyBotCheckPage(driver)) {
             return true;
         }
         if (!properties.selenium().manualVerificationWaitEnabled()) {
             log.warn("Bot-check detected and manual verification is disabled.");
             return false;
         }
+        if (properties.selenium().headless()) {
+            log.warn("Manual verification wait is enabled but Selenium is headless. Set SELENIUM_HEADLESS=false to solve bot checks interactively.");
+        }
         String noVncUrl = resolveNoVncUrl();
+        String context = trend == null || trend.isBlank() ? "page" : "trend='" + trend + "'";
         if (noVncUrl != null) {
-            log.warn("Bot-check detected. Complete verification in Selenium noVNC at {} within {} seconds.",
+            log.warn("Google bot-check detected for {}. Complete verification in Selenium noVNC at {} within {} seconds.",
+                    context,
                     noVncUrl,
+                    properties.selenium().manualVerificationMaxWaitSeconds());
+        } else {
+            log.warn("Google bot-check detected for {}. Waiting up to {} seconds for manual verification.",
+                    context,
                     properties.selenium().manualVerificationMaxWaitSeconds());
         }
         long deadline = System.currentTimeMillis() + properties.selenium().manualVerificationMaxWaitSeconds() * 1000L;
         while (System.currentTimeMillis() < deadline) {
-            if (!isBotCheckPage(driver)) {
+            if (!isLikelyBotCheckPage(driver)) {
                 return true;
             }
             sleep(Math.max(1000, properties.selenium().interactionDelayMs()));
         }
-        log.warn("Timed out while waiting for Selenium bot verification.");
+        log.warn("Timed out while waiting for Selenium bot verification for {}.", context);
         return false;
     }
 
@@ -273,49 +280,27 @@ public class SeleniumBrowserClient {
         }
     }
 
-    boolean isBotCheckPage(WebDriver driver) {
+    boolean isLikelyBotCheckPage(WebDriver driver) {
         try {
-            return looksLikeBotCheck(
-                    driver.getCurrentUrl(),
-                    driver.getTitle(),
-                    extractVisibleText(driver),
-                    hasBotChallengeElement(driver)
-            );
+            String title = safeLower(driver.getTitle());
+            String body = safeLower(driver.getPageSource());
+            boolean hasChallengeFrame = !driver.findElements(BOT_CHALLENGE_SELECTOR).isEmpty();
+            boolean hasNewsCards = !driver.findElements(By.cssSelector("div.SoaBEf, div.dbsr, div.MjjYud, g-card, article, a.WlydOe")).isEmpty();
+            return isLikelyBotCheck(title, body, hasChallengeFrame, hasNewsCards);
         } catch (Exception exception) {
             return false;
         }
     }
 
-    boolean looksLikeBotCheck(String currentUrl, String title, String visibleText, boolean hasChallengeElement) {
-        if (hasChallengeElement) {
-            return true;
-        }
-        String normalizedUrl = safeLower(currentUrl);
-        String normalizedTitle = safeLower(title);
-        String normalizedText = safeLower(visibleText);
-
-        if (normalizedUrl.contains("/sorry/") || normalizedUrl.contains("sorry/index")) {
-            return true;
-        }
-
-        if (normalizedTitle.contains("unusual traffic")) {
-            return true;
-        }
-
-        return normalizedText.contains("our systems have detected unusual traffic from your computer network")
-                || normalizedText.contains("to continue, please type the characters below");
-    }
-
-    private boolean hasBotChallengeElement(WebDriver driver) {
-        return !driver.findElements(BOT_CHALLENGE_SELECTOR).isEmpty();
-    }
-
-    private String extractVisibleText(WebDriver driver) {
-        List<WebElement> bodies = driver.findElements(By.tagName("body"));
-        if (bodies.isEmpty()) {
-            return "";
-        }
-        return bodies.get(0).getText();
+    boolean isLikelyBotCheck(String title, String body, boolean hasChallengeFrame, boolean hasNewsCards) {
+        boolean challengeText = title.contains("unusual traffic")
+                || title.contains("sorry")
+                || body.contains("verify you are human")
+                || body.contains("i'm not a robot")
+                || body.contains("unusual traffic")
+                || body.contains("complete the captcha")
+                || body.contains("g-recaptcha");
+        return (hasChallengeFrame || challengeText) && !hasNewsCards;
     }
 
     private String safeLower(String value) {
