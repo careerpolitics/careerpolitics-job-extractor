@@ -4,6 +4,7 @@ import com.careerpolitics.scraper.config.TrendingProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.PageLoadStrategy;
 import org.openqa.selenium.SessionNotCreatedException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
@@ -23,6 +24,30 @@ import java.util.Random;
 @Slf4j
 @Component
 public class SeleniumBrowserClient {
+
+    private static final String STEALTH_SCRIPT = """
+            Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+            window.chrome = window.chrome || {runtime: {}};
+            Object.defineProperty(navigator, 'platform', {get: () => 'Win32'});
+            Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});
+            Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
+            Object.defineProperty(navigator, 'hardwareConcurrency', {get: () => 8});
+            Object.defineProperty(navigator, 'deviceMemory', {get: () => 8});
+            const getParameter = WebGLRenderingContext.prototype.getParameter;
+            WebGLRenderingContext.prototype.getParameter = function(parameter) {
+              if (parameter === 37445) return 'Intel Inc.';
+              if (parameter === 37446) return 'Intel Iris OpenGL Engine';
+              return getParameter.call(this, parameter);
+            };
+            const originalQuery = window.navigator.permissions && window.navigator.permissions.query;
+            if (originalQuery) {
+              window.navigator.permissions.query = (parameters) => (
+                parameters && parameters.name === 'notifications'
+                  ? Promise.resolve({ state: Notification.permission })
+                  : originalQuery(parameters)
+              );
+            }
+            """;
 
     private final TrendingProperties properties;
     private final Random random = new Random();
@@ -57,7 +82,7 @@ public class SeleniumBrowserClient {
             String proxy = proxies.isEmpty() ? null : proxies.get((attempt - 1) % proxies.size());
             WebDriver driver = null;
             try {
-                driver = new RemoteWebDriver(new URL(properties.selenium().remoteUrl()), buildOptions(proxy));
+                driver = createDriver(proxy);
                 driver.get(url);
 
                 Duration timeout = Duration.ofSeconds(properties.selenium().timeoutSeconds());
@@ -91,14 +116,30 @@ public class SeleniumBrowserClient {
         return "";
     }
 
+    RemoteWebDriver createDriver(String proxy) throws Exception {
+        RemoteWebDriver driver = new RemoteWebDriver(new URL(properties.selenium().remoteUrl()), buildOptions(proxy));
+        applyStealth(driver);
+        return driver;
+    }
+
     ChromeOptions buildOptions(String proxy) {
         ChromeOptions options = new ChromeOptions();
+        options.setPageLoadStrategy(PageLoadStrategy.EAGER);
         if (properties.selenium().headless()) {
             options.addArguments("--headless=new", "--window-size=1600,1200");
         } else {
             options.addArguments("--start-maximized");
         }
-        options.addArguments("--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--lang=en-US");
+        options.addArguments(
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--disable-background-networking",
+                "--disable-background-timer-throttling",
+                "--disable-renderer-backgrounding",
+                "--disable-features=Translate,OptimizationHints,MediaRouter",
+                "--lang=en-US"
+        );
         options.addArguments("--disable-blink-features=AutomationControlled");
         options.setExperimentalOption("excludeSwitches", List.of("enable-automation", "enable-logging"));
         options.setExperimentalOption("useAutomationExtension", false);
@@ -115,6 +156,22 @@ public class SeleniumBrowserClient {
             options.addArguments("--proxy-server=http://" + proxy);
         }
         return options;
+    }
+
+    void applyStealth(RemoteWebDriver driver) {
+        try {
+            driver.get("data:,");
+            executeCdpCommand(driver, "Page.addScriptToEvaluateOnNewDocument", Map.of("source", STEALTH_SCRIPT));
+            if (driver instanceof JavascriptExecutor javascriptExecutor) {
+                javascriptExecutor.executeScript(STEALTH_SCRIPT);
+            }
+        } catch (Exception exception) {
+            log.debug("Unable to apply Selenium stealth script: {}", exception.getMessage());
+        }
+    }
+
+    private void executeCdpCommand(RemoteWebDriver driver, String command, Map<String, Object> parameters) throws Exception {
+        driver.getClass().getMethod("executeCdpCommand", String.class, Map.class).invoke(driver, command, parameters);
     }
 
     private void dismissConsent(WebDriver driver) {

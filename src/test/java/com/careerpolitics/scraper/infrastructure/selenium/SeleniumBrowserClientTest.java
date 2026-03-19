@@ -2,6 +2,7 @@ package com.careerpolitics.scraper.infrastructure.selenium;
 
 import com.careerpolitics.scraper.config.TrendingProperties;
 import org.junit.jupiter.api.Test;
+import org.openqa.selenium.remote.RemoteWebDriver;
 
 import java.time.Duration;
 import java.util.List;
@@ -17,7 +18,8 @@ class SeleniumBrowserClientTest {
         var options = client.buildOptions(null);
 
         assertThat(options.asMap().get("args")).asList().noneMatch(argument -> String.valueOf(argument).startsWith("--user-agent="));
-        assertThat(options.asMap().get("args")).asList().contains("--headless=new", "--window-size=1600,1200");
+        assertThat(options.asMap().get("args")).asList().contains("--headless=new", "--window-size=1600,1200", "--disable-background-networking");
+        assertThat(options.asMap()).containsEntry("pageLoadStrategy", "eager");
     }
 
     @Test
@@ -34,6 +36,17 @@ class SeleniumBrowserClientTest {
         var options = client.buildOptions(null);
 
         assertThat(options.asMap().get("args")).asList().contains("--user-agent=custom-agent", "--start-maximized");
+    }
+
+    @Test
+    void applyStealthFallsBackWithoutThrowingWhenCdpIsUnavailable() throws Exception {
+        SeleniumBrowserClient client = new SeleniumBrowserClient(properties(false, "http://192.168.0.100:4444/wd/hub", ""));
+        RemoteWebDriver driver = org.mockito.Mockito.mock(RemoteWebDriver.class, org.mockito.Mockito.withSettings().extraInterfaces(org.openqa.selenium.JavascriptExecutor.class));
+
+        client.applyStealth(driver);
+
+        org.mockito.Mockito.verify(driver).get("data:,");
+        org.mockito.Mockito.verify((org.openqa.selenium.JavascriptExecutor) driver).executeScript(org.mockito.ArgumentMatchers.anyString());
     }
 
     private TrendingProperties properties(boolean headless, String remoteUrl, String userAgent) {
