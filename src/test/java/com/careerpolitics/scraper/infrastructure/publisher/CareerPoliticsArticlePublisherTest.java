@@ -70,7 +70,7 @@ class CareerPoliticsArticlePublisherTest {
                     .containsEntry("published", true)
                     .containsEntry("main_image", "https://example.com/story.jpg")
                     .containsEntry("description", "Example summary")
-                    .containsEntry("tags", "tag-one,tag2")
+                    .containsEntry("tags", "tagone,tag2")
                     .containsEntry("organization_id", 42);
         } finally {
             server.stop(0);

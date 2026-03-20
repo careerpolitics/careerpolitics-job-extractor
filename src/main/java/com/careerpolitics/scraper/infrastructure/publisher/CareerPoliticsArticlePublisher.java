@@ -140,9 +140,7 @@ public class CareerPoliticsArticlePublisher implements ArticlePublisher {
             return "";
         }
         String normalized = tag.trim().toLowerCase(Locale.ROOT)
-                .replaceAll("[^a-z0-9]+", "-")
-                .replaceAll("(^-+|-+$)", "")
-                .replaceAll("-{2,}", "-");
+                .replaceAll("[^a-z0-9]+", "");
         return normalized;
     }
 
