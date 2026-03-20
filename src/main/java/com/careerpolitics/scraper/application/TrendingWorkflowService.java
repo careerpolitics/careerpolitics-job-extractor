@@ -95,12 +95,17 @@ public class TrendingWorkflowService {
                     trend,
                     draft.strategy(),
                     draft.title());
-            PublishingResult publishingResult = request.shouldPublish()
-                    ? articlePublisher.publish(draft.title(), draft.markdown(), draft.tags(), trend, enrichedHeadlines, request)
-                    : PublishingResult.skipped("Publishing disabled for this request.");
+            PublishingResult publishingResult = articlePublisher.publish(
+                    draft.title(),
+                    draft.markdown(),
+                    draft.tags(),
+                    trend,
+                    enrichedHeadlines,
+                    request
+            );
             boolean published = request.shouldPublish() && publishingResult.success();
 
-            if (request.shouldPublish() && !publishingResult.success()) {
+            if (!publishingResult.success()) {
                 warnings.add("Publishing failed for trend '" + trend + "': " + publishingResult.message());
                 log.warn("Publishing did not succeed for trend='{}': {}", trend, publishingResult.message());
             }

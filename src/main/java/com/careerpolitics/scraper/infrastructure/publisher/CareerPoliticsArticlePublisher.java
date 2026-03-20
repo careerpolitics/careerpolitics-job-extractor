@@ -36,11 +36,6 @@ public class CareerPoliticsArticlePublisher implements ArticlePublisher {
                                     String trend,
                                     List<TrendHeadline> headlines,
                                     TrendingArticleRequest request) {
-        if (!properties.publishing().enabled()) {
-            log.info("Skipping publishing for trend='{}' because publishing is disabled.", trend);
-            return PublishingResult.skipped("Publishing is disabled by configuration.");
-        }
-
         String endpoint = properties.publishing().articleApiUrl();
         String token = request.getArticleApiToken() != null && !request.getArticleApiToken().isBlank()
                 ? request.getArticleApiToken()
@@ -58,7 +53,6 @@ public class CareerPoliticsArticlePublisher implements ArticlePublisher {
         articlePayload.put("title", title);
         articlePayload.put("body_markdown", markdown);
         articlePayload.put("published", request.shouldPublish());
-        articlePayload.put("series", "Trending");
         articlePayload.put("main_image", resolveMainImage(headlines));
         articlePayload.put("description", buildDescription(title, trend, headlines));
         articlePayload.put("tags", toTagString(tags));
