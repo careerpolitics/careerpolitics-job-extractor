@@ -18,7 +18,8 @@ class OpenRouterArticleGeneratorTest {
                 RestClient.create(),
                 new com.fasterxml.jackson.databind.ObjectMapper(),
                 properties(),
-                new TemplateArticleGenerator(new TrendNormalizer())
+                new TemplateArticleGenerator(new TrendNormalizer(), new HeadlineMediaResolver()),
+                new HeadlineMediaResolver()
         );
 
         String payload = generator.extractJsonPayload("""
@@ -41,7 +42,8 @@ class OpenRouterArticleGeneratorTest {
                 RestClient.create(),
                 new com.fasterxml.jackson.databind.ObjectMapper(),
                 properties(),
-                new TemplateArticleGenerator(new TrendNormalizer())
+                new TemplateArticleGenerator(new TrendNormalizer(), new HeadlineMediaResolver()),
+                new HeadlineMediaResolver()
         );
 
         String payload = generator.extractJsonPayload("{\"title\":\"Example\",\"markdown\":\"Body\"}");

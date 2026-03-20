@@ -1,11 +1,11 @@
 package com.careerpolitics.scraper.infrastructure.publisher;
 
 import com.careerpolitics.scraper.config.TrendingProperties;
-import com.careerpolitics.scraper.domain.model.ArticleDetails;
 import com.careerpolitics.scraper.domain.model.PublishingResult;
 import com.careerpolitics.scraper.domain.model.TrendHeadline;
 import com.careerpolitics.scraper.domain.port.ArticlePublisher;
 import com.careerpolitics.scraper.domain.request.TrendingArticleRequest;
+import com.careerpolitics.scraper.infrastructure.article.HeadlineMediaResolver;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -24,10 +24,14 @@ public class CareerPoliticsArticlePublisher implements ArticlePublisher {
 
     private final RestClient restClient;
     private final TrendingProperties properties;
+    private final HeadlineMediaResolver headlineMediaResolver;
 
-    public CareerPoliticsArticlePublisher(RestClient restClient, TrendingProperties properties) {
+    public CareerPoliticsArticlePublisher(RestClient restClient,
+                                         TrendingProperties properties,
+                                         HeadlineMediaResolver headlineMediaResolver) {
         this.restClient = restClient;
         this.properties = properties;
+        this.headlineMediaResolver = headlineMediaResolver;
     }
 
     @Override
@@ -145,24 +149,6 @@ public class CareerPoliticsArticlePublisher implements ArticlePublisher {
     }
 
     private String resolveMainImage(List<TrendHeadline> headlines) {
-        if (headlines == null || headlines.isEmpty()) {
-            return "";
-        }
-        return headlines.stream()
-                .map(TrendHeadline::articleDetails)
-                .filter(details -> details != null && supportsForemMainImage(details))
-                .flatMap(details -> details.mediaUrls().stream())
-                .filter(media -> media != null && !media.isBlank())
-                .findFirst()
-                .orElse("");
-    }
-
-    private boolean supportsForemMainImage(ArticleDetails details) {
-        if (details.mediaUrls() == null || details.mediaUrls().isEmpty()) {
-            return false;
-        }
-        return details.mediaType() == null
-                || "image".equalsIgnoreCase(details.mediaType())
-                || "gif".equalsIgnoreCase(details.mediaType());
+        return headlineMediaResolver.resolveCoverMediaUrl(headlines);
     }
 }
