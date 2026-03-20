@@ -49,16 +49,20 @@ class CareerPoliticsArticlePublisherTest {
 
             assertThat(result.success()).isTrue();
             assertThat(apiKeyHeader.get()).isEqualTo("secret-token");
-            assertThat(capturedPayload.get()).containsEntry("organization_id", 42);
             assertThat(capturedPayload.get()).containsKey("article");
             assertThat(capturedPayload.get().get("article")).isInstanceOf(Map.class);
             @SuppressWarnings("unchecked")
             Map<String, Object> article = (Map<String, Object>) capturedPayload.get().get("article");
             assertThat(article)
                     .containsEntry("title", "Example title")
-                    .containsEntry("content", "Example markdown")
-                    .containsEntry("trend", "example-trend");
-            assertThat(article.get("tags")).asList().containsExactly("tag1", "tag2");
+                    .containsEntry("body_markdown", "Example markdown")
+                    .containsEntry("published", false)
+                    .containsEntry("series", "Trending")
+                    .containsEntry("main_image", "")
+                    .containsEntry("canonical_url", "")
+                    .containsEntry("description", "Example title")
+                    .containsEntry("tags", "tag1,tag2")
+                    .containsEntry("organization_id", 42);
         } finally {
             server.stop(0);
         }
