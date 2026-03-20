@@ -32,5 +32,9 @@ class TemplateArticleGeneratorTest {
         assertTrue(draft.keywords().contains("AI Jobs"));
         assertTrue(draft.markdown().contains("https://example.com/video.mp4"));
         assertFalse(draft.markdown().contains("https://example.com/cover.jpg"));
+        assertTrue(draft.markdown().contains("## Table Of Contents"));
+        assertTrue(draft.markdown().contains("{% card %}"));
+        assertTrue(draft.markdown().contains("{% cta https://careerpolitics.com %}"));
+        assertTrue(draft.markdown().contains("{% details"));
     }
 }
