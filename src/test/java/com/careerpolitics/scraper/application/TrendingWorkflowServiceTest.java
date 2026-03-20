@@ -1,11 +1,13 @@
 package com.careerpolitics.scraper.application;
 
+import com.careerpolitics.scraper.domain.model.ArticleDetails;
 import com.careerpolitics.scraper.domain.model.GeneratedArticleDraft;
 import com.careerpolitics.scraper.domain.model.PublishingResult;
 import com.careerpolitics.scraper.domain.model.TrendHeadline;
 import com.careerpolitics.scraper.domain.port.ArticleGenerator;
 import com.careerpolitics.scraper.domain.port.ArticlePublisher;
 import com.careerpolitics.scraper.domain.port.TrendDiscoveryClient;
+import com.careerpolitics.scraper.domain.port.TrendHeadlineDetailClient;
 import com.careerpolitics.scraper.domain.port.TrendNewsClient;
 import com.careerpolitics.scraper.domain.request.TrendingArticleRequest;
 import org.junit.jupiter.api.Test;
@@ -31,19 +33,24 @@ class TrendingWorkflowServiceTest {
         TrendSelectionService trendSelectionService = Mockito.mock(TrendSelectionService.class);
         ArticleGenerator articleGenerator = Mockito.mock(ArticleGenerator.class);
         ArticlePublisher articlePublisher = Mockito.mock(ArticlePublisher.class);
+        TrendHeadlineDetailClient trendHeadlineDetailClient = Mockito.mock(TrendHeadlineDetailClient.class);
         TrendingWorkflowService service = new TrendingWorkflowService(
                 trendDiscoveryClient,
                 trendNewsClient,
                 trendSelectionService,
                 articleGenerator,
-                articlePublisher
+                articlePublisher,
+                trendHeadlineDetailClient
         );
 
+        List<TrendHeadline> headlines = List.of(
+                new TrendHeadline("AI Jobs", "Hiring expands", "https://example.com/story", "Reuters", null, "Summary",
+                        new ArticleDetails("Summary", "Detailed content", "https://example.com/image.jpg", "image"))
+        );
         when(trendDiscoveryClient.discover(anyString(), anyString(), anyInt())).thenReturn(List.of("AI Jobs"));
         when(trendSelectionService.pickFreshTrends(anyList(), anyInt(), anyInt())).thenReturn(List.of("AI Jobs"));
-        when(trendNewsClient.discover(anyString(), anyString(), anyString(), anyInt())).thenReturn(List.of(
-                new TrendHeadline("AI Jobs", "Hiring expands", "https://example.com/story", "Reuters", null, "Summary", "https://example.com/image.jpg")
-        ));
+        when(trendNewsClient.discover(anyString(), anyString(), anyString(), anyInt())).thenReturn(headlines);
+        when(trendHeadlineDetailClient.enrich(headlines)).thenReturn(headlines);
         when(articleGenerator.generate(anyString(), anyString(), anyList())).thenReturn(
                 new GeneratedArticleDraft("Title", "Markdown", List.of("tag1"), List.of("keyword"), "template")
         );
@@ -65,17 +72,20 @@ class TrendingWorkflowServiceTest {
         TrendSelectionService trendSelectionService = Mockito.mock(TrendSelectionService.class);
         ArticleGenerator articleGenerator = Mockito.mock(ArticleGenerator.class);
         ArticlePublisher articlePublisher = Mockito.mock(ArticlePublisher.class);
+        TrendHeadlineDetailClient trendHeadlineDetailClient = Mockito.mock(TrendHeadlineDetailClient.class);
         TrendingWorkflowService service = new TrendingWorkflowService(
                 trendDiscoveryClient,
                 trendNewsClient,
                 trendSelectionService,
                 articleGenerator,
-                articlePublisher
+                articlePublisher,
+                trendHeadlineDetailClient
         );
 
         when(trendDiscoveryClient.discover(anyString(), anyString(), anyInt())).thenReturn(List.of("AI Jobs"));
         when(trendSelectionService.pickFreshTrends(anyList(), anyInt(), anyInt())).thenReturn(List.of("AI Jobs"));
         when(trendNewsClient.discover(anyString(), anyString(), anyString(), anyInt())).thenReturn(List.of());
+        when(trendHeadlineDetailClient.enrich(List.of())).thenReturn(List.of());
         when(articleGenerator.generate(anyString(), anyString(), anyList())).thenReturn(
                 new GeneratedArticleDraft("Title", "Markdown", List.of("tag1"), List.of("keyword"), "template")
         );

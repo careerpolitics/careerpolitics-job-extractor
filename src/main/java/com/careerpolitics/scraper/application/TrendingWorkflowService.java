@@ -7,6 +7,7 @@ import com.careerpolitics.scraper.domain.model.TrendHeadline;
 import com.careerpolitics.scraper.domain.port.ArticleGenerator;
 import com.careerpolitics.scraper.domain.port.ArticlePublisher;
 import com.careerpolitics.scraper.domain.port.TrendDiscoveryClient;
+import com.careerpolitics.scraper.domain.port.TrendHeadlineDetailClient;
 import com.careerpolitics.scraper.domain.port.TrendNewsClient;
 import com.careerpolitics.scraper.domain.request.TrendingArticleRequest;
 import com.careerpolitics.scraper.domain.response.TrendingArticleResponse;
@@ -27,17 +28,20 @@ public class TrendingWorkflowService {
     private final TrendSelectionService trendSelectionService;
     private final ArticleGenerator articleGenerator;
     private final ArticlePublisher articlePublisher;
+    private final TrendHeadlineDetailClient trendHeadlineDetailClient;
 
     public TrendingWorkflowService(TrendDiscoveryClient trendDiscoveryClient,
                                    TrendNewsClient trendNewsClient,
                                    TrendSelectionService trendSelectionService,
                                    ArticleGenerator articleGenerator,
-                                   ArticlePublisher articlePublisher) {
+                                   ArticlePublisher articlePublisher,
+                                   TrendHeadlineDetailClient trendHeadlineDetailClient) {
         this.trendDiscoveryClient = trendDiscoveryClient;
         this.trendNewsClient = trendNewsClient;
         this.trendSelectionService = trendSelectionService;
         this.articleGenerator = articleGenerator;
         this.articlePublisher = articlePublisher;
+        this.trendHeadlineDetailClient = trendHeadlineDetailClient;
     }
 
     public TrendingArticleResponse generate(TrendingArticleRequest request) {
@@ -76,21 +80,23 @@ public class TrendingWorkflowService {
                     request.getMaxNewsPerTrend()
             );
             log.info("Collected {} headlines for trend='{}'.", headlines.size(), trend);
-            allHeadlines.addAll(headlines);
+            List<TrendHeadline> enrichedHeadlines = trendHeadlineDetailClient.enrich(headlines);
+            log.info("Enriched {} headlines with article details for trend='{}'.", enrichedHeadlines.size(), trend);
+            allHeadlines.addAll(enrichedHeadlines);
 
             List<String> articleWarnings = new ArrayList<>();
-            if (headlines.isEmpty()) {
+            if (enrichedHeadlines.isEmpty()) {
                 articleWarnings.add("No headlines found for trend '" + trend + "'. Generated article uses a template fallback.");
                 log.warn("No headlines found for trend='{}'. Falling back to template-driven article generation.", trend);
             }
 
-            GeneratedArticleDraft draft = articleGenerator.generate(trend, request.getLanguage(), headlines);
+            GeneratedArticleDraft draft = articleGenerator.generate(trend, request.getLanguage(), enrichedHeadlines);
             log.info("Generated article for trend='{}' using strategy='{}' title='{}'.",
                     trend,
                     draft.strategy(),
                     draft.title());
             PublishingResult publishingResult = request.shouldPublish()
-                    ? articlePublisher.publish(draft.title(), draft.markdown(), draft.tags(), trend, headlines, request)
+                    ? articlePublisher.publish(draft.title(), draft.markdown(), draft.tags(), trend, enrichedHeadlines, request)
                     : PublishingResult.skipped("Publishing disabled for this request.");
             boolean published = request.shouldPublish() && publishingResult.success();
 
@@ -112,7 +118,7 @@ public class TrendingWorkflowService {
                     draft.markdown(),
                     draft.tags(),
                     draft.keywords(),
-                    headlines,
+                    enrichedHeadlines,
                     published,
                     publishingResult,
                     articleWarnings,

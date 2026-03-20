@@ -1,6 +1,7 @@
 package com.careerpolitics.scraper.infrastructure.publisher;
 
 import com.careerpolitics.scraper.config.TrendingProperties;
+import com.careerpolitics.scraper.domain.model.ArticleDetails;
 import com.careerpolitics.scraper.domain.model.PublishingResult;
 import com.careerpolitics.scraper.domain.model.TrendHeadline;
 import com.careerpolitics.scraper.domain.request.TrendingArticleRequest;
@@ -52,7 +53,7 @@ class CareerPoliticsArticlePublisherTest {
                             "Reuters",
                             "2 hours ago",
                             "Example summary",
-                            "https://example.com/story.jpg"
+                            new ArticleDetails("Example summary", "Long form content", "https://example.com/story.jpg", "image")
                     )),
                     request
             );
@@ -69,7 +70,7 @@ class CareerPoliticsArticlePublisherTest {
                     .containsEntry("published", true)
                     .containsEntry("series", "Trending")
                     .containsEntry("main_image", "https://example.com/story.jpg")
-                    .containsEntry("description", "Example title")
+                    .containsEntry("description", "Example summary")
                     .containsEntry("tags", "tag1,tag2")
                     .containsEntry("organization_id", 42);
         } finally {

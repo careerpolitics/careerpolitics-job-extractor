@@ -47,12 +47,15 @@ public class TemplateArticleGenerator implements ArticleGenerator {
         } else {
             builder.append("Recent headlines indicate the following discussion points:\n\n");
             for (TrendHeadline headline : headlines) {
+                String context = headline.articleDetails() != null && headline.articleDetails().description() != null
+                        ? headline.articleDetails().description()
+                        : headline.summary();
                 builder.append("- **")
                         .append(headline.title())
                         .append("** — ")
                         .append(headline.source() == null ? "Unknown source" : headline.source())
                         .append(". ")
-                        .append(headline.summary() == null ? "" : headline.summary())
+                        .append(context == null ? "" : context)
                         .append("\n");
             }
             builder.append("\n");

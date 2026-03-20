@@ -1,6 +1,7 @@
 package com.careerpolitics.scraper.infrastructure.article;
 
 import com.careerpolitics.scraper.application.TrendNormalizer;
+import com.careerpolitics.scraper.domain.model.ArticleDetails;
 import com.careerpolitics.scraper.domain.model.GeneratedArticleDraft;
 import com.careerpolitics.scraper.domain.model.TrendHeadline;
 import org.junit.jupiter.api.Test;
@@ -18,7 +19,8 @@ class TemplateArticleGeneratorTest {
         GeneratedArticleDraft draft = generator.generate(
                 "AI Jobs",
                 "en-US",
-                List.of(new TrendHeadline("AI Jobs", "Hiring expands", "https://example.com", "Reuters", null, "New hiring wave", "https://example.com/image.jpg"))
+                List.of(new TrendHeadline("AI Jobs", "Hiring expands", "https://example.com", "Reuters", null, "New hiring wave",
+                        new ArticleDetails("Hiring wave expands", "Detailed article content", "https://example.com/image.jpg", "image")))
         );
 
         assertTrue(draft.markdown().contains("# AI Jobs"));

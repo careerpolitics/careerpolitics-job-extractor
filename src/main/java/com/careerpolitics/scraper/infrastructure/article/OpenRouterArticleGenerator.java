@@ -69,10 +69,23 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
     private String buildPrompt(String trend, String language, List<TrendHeadline> headlines) {
         StringBuilder builder = new StringBuilder();
         builder.append("Create a concise article in ").append(language).append(" about trend: ").append(trend).append(". ");
-        builder.append("Use these headlines:\n");
+        builder.append("Use these headlines, extracted article details, and supported media when relevant:\n");
         for (TrendHeadline headline : headlines) {
-            builder.append("- ").append(headline.title()).append(" | ").append(headline.source()).append("\n");
+            builder.append("- Title: ").append(headline.title())
+                    .append(" | Source: ").append(headline.source())
+                    .append(" | Summary: ").append(safe(headline.summary()))
+                    .append("\n");
+            if (headline.articleDetails() != null) {
+                builder.append("  Description: ").append(safe(headline.articleDetails().description())).append("\n");
+                builder.append("  Content excerpt: ").append(safe(headline.articleDetails().content())).append("\n");
+                builder.append("  Media: ").append(safe(headline.articleDetails().mediaType())).append(" -> ")
+                        .append(safe(headline.articleDetails().mediaUrl())).append("\n");
+            }
         }
         return builder.toString();
+    }
+
+    private String safe(String value) {
+        return value == null || value.isBlank() ? "n/a" : value;
     }
 }

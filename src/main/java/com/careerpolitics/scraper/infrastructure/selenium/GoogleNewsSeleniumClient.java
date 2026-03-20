@@ -2,6 +2,7 @@ package com.careerpolitics.scraper.infrastructure.selenium;
 
 import com.careerpolitics.scraper.application.TrendNormalizer;
 import com.careerpolitics.scraper.config.TrendingProperties;
+import com.careerpolitics.scraper.domain.model.ArticleDetails;
 import com.careerpolitics.scraper.domain.model.TrendHeadline;
 import com.careerpolitics.scraper.domain.port.TrendNewsClient;
 import lombok.extern.slf4j.Slf4j;
@@ -68,7 +69,12 @@ public class GoogleNewsSeleniumClient implements TrendNewsClient {
                     source.isBlank() ? "Google News" : trendNormalizer.clean(source),
                     publishedAt.isBlank() ? null : trendNormalizer.clean(publishedAt),
                     summary.isBlank() ? null : trendNormalizer.clean(summary),
-                    media
+                    new ArticleDetails(
+                            summary.isBlank() ? null : trendNormalizer.clean(summary),
+                            null,
+                            media,
+                            inferMediaType(media)
+                    )
             ));
         }
         return unique.values().stream().limit(Math.max(1, maxNewsPerTrend)).toList();
@@ -122,6 +128,23 @@ public class GoogleNewsSeleniumClient implements TrendNewsClient {
         }
         String candidate = srcSet.split(",")[0].trim().split("\\s+")[0];
         return candidate.isBlank() ? null : candidate;
+    }
+
+    private String inferMediaType(String mediaUrl) {
+        if (mediaUrl == null || mediaUrl.isBlank()) {
+            return null;
+        }
+        String lower = mediaUrl.toLowerCase();
+        if (lower.endsWith(".gif") || lower.contains(".gif?")) {
+            return "gif";
+        }
+        if (lower.contains("youtube.com") || lower.contains("youtu.be")) {
+            return "youtube";
+        }
+        if (lower.endsWith(".mp4") || lower.contains(".mp4?")) {
+            return "video";
+        }
+        return "image";
     }
 
     private String encode(String value) {

@@ -35,7 +35,8 @@ class GoogleNewsSeleniumClientTest {
         assertEquals("https://example.com/story", headlines.get(0).link());
         assertEquals("Reuters", headlines.get(0).source());
         assertEquals("Market rally continues", headlines.get(0).title());
-        assertEquals("https://example.com/story.jpg", headlines.get(0).media());
+        assertEquals("https://example.com/story.jpg", headlines.get(0).articleDetails().mediaUrl());
+        assertEquals("image", headlines.get(0).articleDetails().mediaType());
     }
 
     private TrendingProperties properties() {

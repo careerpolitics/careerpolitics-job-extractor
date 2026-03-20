@@ -1,6 +1,7 @@
 package com.careerpolitics.scraper.infrastructure.publisher;
 
 import com.careerpolitics.scraper.config.TrendingProperties;
+import com.careerpolitics.scraper.domain.model.ArticleDetails;
 import com.careerpolitics.scraper.domain.model.PublishingResult;
 import com.careerpolitics.scraper.domain.model.TrendHeadline;
 import com.careerpolitics.scraper.domain.port.ArticlePublisher;
@@ -59,7 +60,7 @@ public class CareerPoliticsArticlePublisher implements ArticlePublisher {
         articlePayload.put("published", request.shouldPublish());
         articlePayload.put("series", "Trending");
         articlePayload.put("main_image", resolveMainImage(headlines));
-        articlePayload.put("description", buildDescription(title, trend));
+        articlePayload.put("description", buildDescription(title, trend, headlines));
         articlePayload.put("tags", toTagString(tags));
         articlePayload.put("organization_id", organizationId == null ? 0L : organizationId);
 
@@ -111,7 +112,16 @@ public class CareerPoliticsArticlePublisher implements ArticlePublisher {
         return singleLine.length() > 500 ? singleLine.substring(0, 500) + "..." : singleLine;
     }
 
-    private String buildDescription(String title, String trend) {
+    private String buildDescription(String title, String trend, List<TrendHeadline> headlines) {
+        if (headlines != null) {
+            for (TrendHeadline headline : headlines) {
+                if (headline.articleDetails() != null
+                        && headline.articleDetails().description() != null
+                        && !headline.articleDetails().description().isBlank()) {
+                    return headline.articleDetails().description();
+                }
+            }
+        }
         if (title != null && !title.isBlank()) {
             return title;
         }
@@ -135,9 +145,20 @@ public class CareerPoliticsArticlePublisher implements ArticlePublisher {
             return "";
         }
         return headlines.stream()
-                .map(TrendHeadline::media)
+                .map(TrendHeadline::articleDetails)
+                .filter(details -> details != null && supportsForemMainImage(details))
+                .map(ArticleDetails::mediaUrl)
                 .filter(media -> media != null && !media.isBlank())
                 .findFirst()
                 .orElse("");
+    }
+
+    private boolean supportsForemMainImage(ArticleDetails details) {
+        if (details.mediaUrl() == null || details.mediaUrl().isBlank()) {
+            return false;
+        }
+        return details.mediaType() == null
+                || "image".equalsIgnoreCase(details.mediaType())
+                || "gif".equalsIgnoreCase(details.mediaType());
     }
 }
