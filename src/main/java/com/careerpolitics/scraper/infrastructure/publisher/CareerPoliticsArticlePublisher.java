@@ -147,14 +147,14 @@ public class CareerPoliticsArticlePublisher implements ArticlePublisher {
         return headlines.stream()
                 .map(TrendHeadline::articleDetails)
                 .filter(details -> details != null && supportsForemMainImage(details))
-                .map(ArticleDetails::mediaUrl)
+                .flatMap(details -> details.mediaUrls().stream())
                 .filter(media -> media != null && !media.isBlank())
                 .findFirst()
                 .orElse("");
     }
 
     private boolean supportsForemMainImage(ArticleDetails details) {
-        if (details.mediaUrl() == null || details.mediaUrl().isBlank()) {
+        if (details.mediaUrls() == null || details.mediaUrls().isEmpty()) {
             return false;
         }
         return details.mediaType() == null

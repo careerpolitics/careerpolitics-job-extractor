@@ -14,8 +14,11 @@ import org.springframework.stereotype.Component;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 
 @Slf4j
 @Component
@@ -72,7 +75,7 @@ public class GoogleNewsSeleniumClient implements TrendNewsClient {
                     new ArticleDetails(
                             summary.isBlank() ? null : trendNormalizer.clean(summary),
                             null,
-                            media,
+                            sanitizeMediaUrls(media == null ? List.of() : List.of(media)),
                             inferMediaType(media)
                     )
             ));
@@ -134,7 +137,7 @@ public class GoogleNewsSeleniumClient implements TrendNewsClient {
         if (mediaUrl == null || mediaUrl.isBlank()) {
             return null;
         }
-        String lower = mediaUrl.toLowerCase();
+        String lower = mediaUrl.toLowerCase(Locale.ROOT);
         if (lower.endsWith(".gif") || lower.contains(".gif?")) {
             return "gif";
         }
@@ -145,6 +148,21 @@ public class GoogleNewsSeleniumClient implements TrendNewsClient {
             return "video";
         }
         return "image";
+    }
+
+    private List<String> sanitizeMediaUrls(List<String> rawUrls) {
+        LinkedHashSet<String> sanitized = new LinkedHashSet<>();
+        for (String rawUrl : rawUrls) {
+            if (rawUrl == null || rawUrl.isBlank()) {
+                continue;
+            }
+            String trimmed = rawUrl.trim();
+            if (trimmed.toLowerCase(Locale.ROOT).startsWith("data:")) {
+                continue;
+            }
+            sanitized.add(trimmed);
+        }
+        return new ArrayList<>(sanitized);
     }
 
     private String encode(String value) {
