@@ -28,8 +28,8 @@ services:
     image: selenium/standalone-chrome:127.0
     container_name: careerpolitics-selenium
     ports:
-      - "4444:4444"
-      - "7900:7900"
+      - "${SELENIUM_HOST_BIND:-127.0.0.1}:${SELENIUM_PORT:-4444}:4444"
+      - "${SELENIUM_VNC_HOST_BIND:-127.0.0.1}:${SELENIUM_VNC_PORT:-7900}:7900"
     shm_size: 1g
     environment:
       SE_VNC_NO_PASSWORD: 1
