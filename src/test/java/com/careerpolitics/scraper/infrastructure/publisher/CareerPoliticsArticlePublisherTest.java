@@ -2,6 +2,7 @@ package com.careerpolitics.scraper.infrastructure.publisher;
 
 import com.careerpolitics.scraper.config.TrendingProperties;
 import com.careerpolitics.scraper.domain.model.PublishingResult;
+import com.careerpolitics.scraper.domain.model.TrendHeadline;
 import com.careerpolitics.scraper.domain.request.TrendingArticleRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
@@ -44,6 +45,15 @@ class CareerPoliticsArticlePublisherTest {
                     "Example markdown",
                     List.of("tag1", "tag2"),
                     "example-trend",
+                    List.of(new TrendHeadline(
+                            "example-trend",
+                            "Example headline",
+                            "https://example.com/story",
+                            "Reuters",
+                            "2 hours ago",
+                            "Example summary",
+                            "https://example.com/story.jpg"
+                    )),
                     request
             );
 
@@ -56,10 +66,9 @@ class CareerPoliticsArticlePublisherTest {
             assertThat(article)
                     .containsEntry("title", "Example title")
                     .containsEntry("body_markdown", "Example markdown")
-                    .containsEntry("published", false)
+                    .containsEntry("published", true)
                     .containsEntry("series", "Trending")
-                    .containsEntry("main_image", "")
-                    .containsEntry("canonical_url", "")
+                    .containsEntry("main_image", "https://example.com/story.jpg")
                     .containsEntry("description", "Example title")
                     .containsEntry("tags", "tag1,tag2")
                     .containsEntry("organization_id", 42);
@@ -91,6 +100,7 @@ class CareerPoliticsArticlePublisherTest {
                     "Example markdown",
                     List.of("tag1"),
                     "example-trend",
+                    List.of(),
                     new TrendingArticleRequest()
             );
 

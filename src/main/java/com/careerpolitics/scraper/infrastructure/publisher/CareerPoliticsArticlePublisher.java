@@ -2,6 +2,7 @@ package com.careerpolitics.scraper.infrastructure.publisher;
 
 import com.careerpolitics.scraper.config.TrendingProperties;
 import com.careerpolitics.scraper.domain.model.PublishingResult;
+import com.careerpolitics.scraper.domain.model.TrendHeadline;
 import com.careerpolitics.scraper.domain.port.ArticlePublisher;
 import com.careerpolitics.scraper.domain.request.TrendingArticleRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +33,7 @@ public class CareerPoliticsArticlePublisher implements ArticlePublisher {
                                     String markdown,
                                     List<String> tags,
                                     String trend,
+                                    List<TrendHeadline> headlines,
                                     TrendingArticleRequest request) {
         if (!properties.publishing().enabled()) {
             log.info("Skipping publishing for trend='{}' because publishing is disabled.", trend);
@@ -54,10 +56,9 @@ public class CareerPoliticsArticlePublisher implements ArticlePublisher {
         Map<String, Object> articlePayload = new LinkedHashMap<>();
         articlePayload.put("title", title);
         articlePayload.put("body_markdown", markdown);
-        articlePayload.put("published", false);
+        articlePayload.put("published", request.shouldPublish());
         articlePayload.put("series", "Trending");
-        articlePayload.put("main_image", "");
-        articlePayload.put("canonical_url", "");
+        articlePayload.put("main_image", resolveMainImage(headlines));
         articlePayload.put("description", buildDescription(title, trend));
         articlePayload.put("tags", toTagString(tags));
         articlePayload.put("organization_id", organizationId == null ? 0L : organizationId);
@@ -126,6 +127,17 @@ public class CareerPoliticsArticlePublisher implements ArticlePublisher {
                 .filter(tag -> !tag.isBlank())
                 .distinct()
                 .reduce((left, right) -> left + "," + right)
+                .orElse("");
+    }
+
+    private String resolveMainImage(List<TrendHeadline> headlines) {
+        if (headlines == null || headlines.isEmpty()) {
+            return "";
+        }
+        return headlines.stream()
+                .map(TrendHeadline::media)
+                .filter(media -> media != null && !media.isBlank())
+                .findFirst()
                 .orElse("");
     }
 }

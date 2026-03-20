@@ -39,7 +39,7 @@ public class TrendingScheduler {
             request.setMaxNewsPerTrend(properties.scheduler().maxNewsPerTrend());
             request.setTrendCooldownHours(properties.scheduler().trendCooldownHours());
             request.setPublish(properties.scheduler().publish());
-            request.setFallbackTrends(properties.discovery().fallbackTrends());
+            request.setRequestedTrends(properties.discovery().fallbackTrends());
             workflowService.generate(request);
             log.info("Scheduled trending article run finished successfully.");
         } catch (Exception exception) {
