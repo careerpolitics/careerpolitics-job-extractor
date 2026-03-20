@@ -77,6 +77,7 @@ public class JsoupTrendHeadlineDetailClient implements TrendHeadlineDetailClient
         rawMediaCandidates.add(metaContent(document, "meta[property=og:video]"));
         rawMediaCandidates.add(metaContent(document, "meta[property=og:video:url]"));
         rawMediaCandidates.add(iframeSource(document));
+        rawMediaCandidates.addAll(extractSupportedMediaUrls(document));
         if (headline.articleDetails() != null && headline.articleDetails().mediaUrls() != null) {
             rawMediaCandidates.addAll(headline.articleDetails().mediaUrls());
         }
@@ -154,6 +155,45 @@ public class JsoupTrendHeadlineDetailClient implements TrendHeadlineDetailClient
             }
         }
         return null;
+    }
+
+    private List<String> extractSupportedMediaUrls(Document document) {
+        List<String> urls = new ArrayList<>();
+        for (Element element : document.select("img[src], source[src], video[src], audio[src], iframe[src], a[href]")) {
+            String attribute = element.hasAttr("src") ? "src" : "href";
+            String url = element.absUrl(attribute);
+            if (url == null || url.isBlank()) {
+                url = element.attr(attribute);
+            }
+            if (isSupportedMediaUrl(url)) {
+                urls.add(url.trim());
+            }
+        }
+        return urls;
+    }
+
+    private boolean isSupportedMediaUrl(String url) {
+        if (url == null || url.isBlank()) {
+            return false;
+        }
+        String lower = url.toLowerCase(Locale.ROOT);
+        return lower.endsWith(".png")
+                || lower.endsWith(".jpg")
+                || lower.endsWith(".jpeg")
+                || lower.endsWith(".webp")
+                || lower.endsWith(".gif")
+                || lower.endsWith(".mp4")
+                || lower.endsWith(".mp3")
+                || lower.contains("youtube.com")
+                || lower.contains("youtu.be")
+                || lower.contains("twitter.com")
+                || lower.contains("x.com")
+                || lower.contains("spotify.com")
+                || lower.contains("codepen.io")
+                || lower.contains("stackblitz.com")
+                || lower.contains("twitch.tv")
+                || lower.contains("github.com")
+                || lower.contains("dev.to");
     }
 
     private List<String> sanitizeMediaUrls(List<String> rawCandidates) {

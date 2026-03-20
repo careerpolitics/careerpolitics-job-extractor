@@ -149,6 +149,10 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
                 5. Optional embeds
                 Use raw media URLs (YouTube / GIF / image / video) if relevant.
                 Use one strong visual as the cover image and consider other relevant media in markdown only when it genuinely helps the article.
+                Always use Forem-compatible syntax:
+                • Images/GIFs -> markdown image syntax with meaningful alt text
+                • External media -> {%% embed URL %%}
+                • Never render unsupported raw HTML embeds
 
                 ---
 
@@ -179,6 +183,8 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
                 • Bullet points for clarity
                 • Bold key terms
                 • No long text blocks
+                • Do not use `#` headings in the article body; start sections with `##`
+                • Always return a rich-format article with cards, CTAs, details blocks, and a table of contents
 
                 ---
 
