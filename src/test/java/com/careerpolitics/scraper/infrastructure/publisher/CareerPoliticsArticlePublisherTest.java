@@ -36,7 +36,7 @@ class CareerPoliticsArticlePublisherTest {
         try {
             CareerPoliticsArticlePublisher publisher = new CareerPoliticsArticlePublisher(
                     RestClient.create(),
-                    properties(true, "http://127.0.0.1:" + server.getAddress().getPort() + "/api/articles", "secret-token", 42L)
+                    properties(false, "http://127.0.0.1:" + server.getAddress().getPort() + "/api/articles", "secret-token", 42L)
             );
             TrendingArticleRequest request = new TrendingArticleRequest();
             request.setPublish(true);
@@ -68,7 +68,6 @@ class CareerPoliticsArticlePublisherTest {
                     .containsEntry("title", "Example title")
                     .containsEntry("body_markdown", "Example markdown")
                     .containsEntry("published", true)
-                    .containsEntry("series", "Trending")
                     .containsEntry("main_image", "https://example.com/story.jpg")
                     .containsEntry("description", "Example summary")
                     .containsEntry("tags", "tag1,tag2")

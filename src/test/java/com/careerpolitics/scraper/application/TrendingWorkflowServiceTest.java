@@ -99,4 +99,44 @@ class TrendingWorkflowServiceTest {
 
         verify(trendSelectionService, never()).remember(anyString(), anyBoolean());
     }
+
+    @Test
+    void stillSendsArticleToPublisherWhenPublishFlagIsFalse() {
+        TrendDiscoveryClient trendDiscoveryClient = Mockito.mock(TrendDiscoveryClient.class);
+        TrendNewsClient trendNewsClient = Mockito.mock(TrendNewsClient.class);
+        TrendSelectionService trendSelectionService = Mockito.mock(TrendSelectionService.class);
+        ArticleGenerator articleGenerator = Mockito.mock(ArticleGenerator.class);
+        ArticlePublisher articlePublisher = Mockito.mock(ArticlePublisher.class);
+        TrendHeadlineDetailClient trendHeadlineDetailClient = Mockito.mock(TrendHeadlineDetailClient.class);
+        TrendingWorkflowService service = new TrendingWorkflowService(
+                trendDiscoveryClient,
+                trendNewsClient,
+                trendSelectionService,
+                articleGenerator,
+                articlePublisher,
+                trendHeadlineDetailClient
+        );
+
+        List<TrendHeadline> headlines = List.of(
+                new TrendHeadline("AI Jobs", "Hiring expands", "https://example.com/story", "Reuters", null, "Summary",
+                        new ArticleDetails("Summary", "Detailed content", List.of("https://example.com/image.jpg"), "image"))
+        );
+        when(trendDiscoveryClient.discover(anyString(), anyString(), anyInt())).thenReturn(List.of("AI Jobs"));
+        when(trendSelectionService.pickFreshTrends(anyList(), anyInt(), anyInt())).thenReturn(List.of("AI Jobs"));
+        when(trendNewsClient.discover(anyString(), anyString(), anyString(), anyInt())).thenReturn(headlines);
+        when(trendHeadlineDetailClient.enrich(headlines)).thenReturn(headlines);
+        when(articleGenerator.generate(anyString(), anyString(), anyList())).thenReturn(
+                new GeneratedArticleDraft("Title", "Markdown", List.of("tag1"), List.of("keyword"), "template")
+        );
+        when(articlePublisher.publish(anyString(), anyString(), anyList(), anyString(), anyList(), any())).thenReturn(
+                new PublishingResult(true, "Stored as draft.", null)
+        );
+
+        TrendingArticleRequest request = new TrendingArticleRequest();
+        request.setPublish(false);
+        service.generate(request);
+
+        verify(articlePublisher).publish(anyString(), anyString(), anyList(), anyString(), anyList(), any());
+        verify(trendSelectionService, never()).remember(anyString(), anyBoolean());
+    }
 }
