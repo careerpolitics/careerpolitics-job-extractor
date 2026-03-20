@@ -90,7 +90,7 @@ public class TrendingWorkflowService {
                     draft.strategy(),
                     draft.title());
             PublishingResult publishingResult = request.shouldPublish()
-                    ? articlePublisher.publish(draft.title(), draft.markdown(), draft.tags(), trend, request)
+                    ? articlePublisher.publish(draft.title(), draft.markdown(), draft.tags(), trend, headlines, request)
                     : PublishingResult.skipped("Publishing disabled for this request.");
             boolean published = request.shouldPublish() && publishingResult.success();
 
@@ -99,8 +99,12 @@ public class TrendingWorkflowService {
                 log.warn("Publishing did not succeed for trend='{}': {}", trend, publishingResult.message());
             }
 
-            trendSelectionService.remember(trend, published);
-            log.info("Recorded trend='{}' in history with published={}", trend, published);
+            if (published) {
+                trendSelectionService.remember(trend, true);
+                log.info("Recorded trend='{}' in history after successful publishing.", trend);
+            } else {
+                log.info("Skipping cooldown history for trend='{}' because the article was not published successfully.", trend);
+            }
 
             articles.add(new GeneratedArticle(
                     trend,
@@ -128,12 +132,12 @@ public class TrendingWorkflowService {
         return response;
     }
 
-    public List<String> discoverTrends(String geo, String language, int maxTrends, List<String> fallbackTrends) {
+    public List<String> discoverTrends(String geo, String language, int maxTrends, List<String> requestedTrends) {
         TrendingArticleRequest request = new TrendingArticleRequest();
         request.setGeo(geo);
         request.setLanguage(language);
         request.setMaxTrends(maxTrends);
-        request.setFallbackTrends(fallbackTrends);
+        request.setRequestedTrends(requestedTrends);
         return discoverCandidateTrends(request);
     }
 
@@ -149,14 +153,14 @@ public class TrendingWorkflowService {
     }
 
     private List<String> discoverCandidateTrends(TrendingArticleRequest request) {
-        if (request.getFallbackTrends() != null && !request.getFallbackTrends().isEmpty()) {
-            List<String> fallbackTrends = request.getFallbackTrends().stream()
+        if (request.getRequestedTrends() != null && !request.getRequestedTrends().isEmpty()) {
+            List<String> requestedTrends = request.getRequestedTrends().stream()
                     .map(String::trim)
                     .filter(value -> !value.isBlank())
                     .limit(request.getMaxTrends())
                     .toList();
-            log.info("Using {} fallback trends from request instead of Selenium discovery.", fallbackTrends.size());
-            return fallbackTrends;
+            log.info("Using {} requested trends from request instead of Selenium discovery.", requestedTrends.size());
+            return requestedTrends;
         }
         return trendDiscoveryClient.discover(request.getGeo(), request.getLanguage(), request.getMaxTrends());
     }

@@ -57,6 +57,7 @@ public class GoogleNewsSeleniumClient implements TrendNewsClient {
             String source = extractText(card, ".CEMjEf span, .NUnG9d span, .XTjFC, cite");
             String publishedAt = extractText(card, "time, .OSrXXb, .ZE0LJd span");
             String summary = extractText(card, ".GI74Re, .Y3v8qd, .st");
+            String media = extractMediaUrl(card);
             if (title.isBlank() || link.isBlank()) {
                 continue;
             }
@@ -66,7 +67,8 @@ public class GoogleNewsSeleniumClient implements TrendNewsClient {
                     link,
                     source.isBlank() ? "Google News" : trendNormalizer.clean(source),
                     publishedAt.isBlank() ? null : trendNormalizer.clean(publishedAt),
-                    summary.isBlank() ? null : trendNormalizer.clean(summary)
+                    summary.isBlank() ? null : trendNormalizer.clean(summary),
+                    media
             ));
         }
         return unique.values().stream().limit(Math.max(1, maxNewsPerTrend)).toList();
@@ -97,6 +99,29 @@ public class GoogleNewsSeleniumClient implements TrendNewsClient {
     private String extractLink(Element root) {
         Element anchor = root.selectFirst("a[href]");
         return anchor == null ? "" : anchor.absUrl("href");
+    }
+
+    private String extractMediaUrl(Element root) {
+        Element image = root.selectFirst("img[src], img[data-src], img[data-iurl], img[srcset]");
+        if (image == null) {
+            return null;
+        }
+        for (String attribute : List.of("src", "data-src", "data-iurl")) {
+            String value = image.absUrl(attribute);
+            if (!value.isBlank()) {
+                return value;
+            }
+            value = image.attr(attribute);
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        String srcSet = image.attr("srcset");
+        if (srcSet == null || srcSet.isBlank()) {
+            return null;
+        }
+        String candidate = srcSet.split(",")[0].trim().split("\\s+")[0];
+        return candidate.isBlank() ? null : candidate;
     }
 
     private String encode(String value) {

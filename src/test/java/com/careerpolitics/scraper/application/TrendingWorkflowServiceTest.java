@@ -1,0 +1,92 @@
+package com.careerpolitics.scraper.application;
+
+import com.careerpolitics.scraper.domain.model.GeneratedArticleDraft;
+import com.careerpolitics.scraper.domain.model.PublishingResult;
+import com.careerpolitics.scraper.domain.model.TrendHeadline;
+import com.careerpolitics.scraper.domain.port.ArticleGenerator;
+import com.careerpolitics.scraper.domain.port.ArticlePublisher;
+import com.careerpolitics.scraper.domain.port.TrendDiscoveryClient;
+import com.careerpolitics.scraper.domain.port.TrendNewsClient;
+import com.careerpolitics.scraper.domain.request.TrendingArticleRequest;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+
+import java.util.List;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+class TrendingWorkflowServiceTest {
+
+    @Test
+    void remembersTrendOnlyAfterSuccessfulPublish() {
+        TrendDiscoveryClient trendDiscoveryClient = Mockito.mock(TrendDiscoveryClient.class);
+        TrendNewsClient trendNewsClient = Mockito.mock(TrendNewsClient.class);
+        TrendSelectionService trendSelectionService = Mockito.mock(TrendSelectionService.class);
+        ArticleGenerator articleGenerator = Mockito.mock(ArticleGenerator.class);
+        ArticlePublisher articlePublisher = Mockito.mock(ArticlePublisher.class);
+        TrendingWorkflowService service = new TrendingWorkflowService(
+                trendDiscoveryClient,
+                trendNewsClient,
+                trendSelectionService,
+                articleGenerator,
+                articlePublisher
+        );
+
+        when(trendDiscoveryClient.discover(anyString(), anyString(), anyInt())).thenReturn(List.of("AI Jobs"));
+        when(trendSelectionService.pickFreshTrends(anyList(), anyInt(), anyInt())).thenReturn(List.of("AI Jobs"));
+        when(trendNewsClient.discover(anyString(), anyString(), anyString(), anyInt())).thenReturn(List.of(
+                new TrendHeadline("AI Jobs", "Hiring expands", "https://example.com/story", "Reuters", null, "Summary", "https://example.com/image.jpg")
+        ));
+        when(articleGenerator.generate(anyString(), anyString(), anyList())).thenReturn(
+                new GeneratedArticleDraft("Title", "Markdown", List.of("tag1"), List.of("keyword"), "template")
+        );
+        when(articlePublisher.publish(anyString(), anyString(), anyList(), anyString(), anyList(), any())).thenReturn(
+                new PublishingResult(true, "Published successfully.", null)
+        );
+
+        TrendingArticleRequest request = new TrendingArticleRequest();
+        request.setPublish(true);
+        service.generate(request);
+
+        verify(trendSelectionService).remember("AI Jobs", true);
+    }
+
+    @Test
+    void doesNotRememberTrendWhenPublishingFailsOrIsSkipped() {
+        TrendDiscoveryClient trendDiscoveryClient = Mockito.mock(TrendDiscoveryClient.class);
+        TrendNewsClient trendNewsClient = Mockito.mock(TrendNewsClient.class);
+        TrendSelectionService trendSelectionService = Mockito.mock(TrendSelectionService.class);
+        ArticleGenerator articleGenerator = Mockito.mock(ArticleGenerator.class);
+        ArticlePublisher articlePublisher = Mockito.mock(ArticlePublisher.class);
+        TrendingWorkflowService service = new TrendingWorkflowService(
+                trendDiscoveryClient,
+                trendNewsClient,
+                trendSelectionService,
+                articleGenerator,
+                articlePublisher
+        );
+
+        when(trendDiscoveryClient.discover(anyString(), anyString(), anyInt())).thenReturn(List.of("AI Jobs"));
+        when(trendSelectionService.pickFreshTrends(anyList(), anyInt(), anyInt())).thenReturn(List.of("AI Jobs"));
+        when(trendNewsClient.discover(anyString(), anyString(), anyString(), anyInt())).thenReturn(List.of());
+        when(articleGenerator.generate(anyString(), anyString(), anyList())).thenReturn(
+                new GeneratedArticleDraft("Title", "Markdown", List.of("tag1"), List.of("keyword"), "template")
+        );
+        when(articlePublisher.publish(anyString(), anyString(), anyList(), anyString(), anyList(), any())).thenReturn(
+                new PublishingResult(false, "Publish failed.", null)
+        );
+
+        TrendingArticleRequest request = new TrendingArticleRequest();
+        request.setPublish(true);
+        service.generate(request);
+
+        verify(trendSelectionService, never()).remember(anyString(), anyBoolean());
+    }
+}
