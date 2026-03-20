@@ -14,9 +14,11 @@ import java.util.List;
 public class TemplateArticleGenerator implements ArticleGenerator {
 
     private final TrendNormalizer trendNormalizer;
+    private final HeadlineMediaResolver headlineMediaResolver;
 
-    public TemplateArticleGenerator(TrendNormalizer trendNormalizer) {
+    public TemplateArticleGenerator(TrendNormalizer trendNormalizer, HeadlineMediaResolver headlineMediaResolver) {
         this.trendNormalizer = trendNormalizer;
+        this.headlineMediaResolver = headlineMediaResolver;
     }
 
     @Override
@@ -74,12 +76,8 @@ public class TemplateArticleGenerator implements ArticleGenerator {
             }
         }
 
-        List<String> mediaUrls = headlines.stream()
-                .filter(headline -> headline.articleDetails() != null && headline.articleDetails().mediaUrls() != null)
-                .flatMap(headline -> headline.articleDetails().mediaUrls().stream())
-                .distinct()
-                .skip(1)
-                .limit(2)
+        List<String> mediaUrls = headlineMediaResolver.resolveAdditionalMedia(headlines, 2).stream()
+                .map(HeadlineMediaResolver.ResolvedMedia::url)
                 .toList();
         if (!mediaUrls.isEmpty()) {
             builder.append("\n## Related media\n\n");

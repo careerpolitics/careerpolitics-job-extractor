@@ -5,6 +5,7 @@ import com.careerpolitics.scraper.domain.model.ArticleDetails;
 import com.careerpolitics.scraper.domain.model.PublishingResult;
 import com.careerpolitics.scraper.domain.model.TrendHeadline;
 import com.careerpolitics.scraper.domain.request.TrendingArticleRequest;
+import com.careerpolitics.scraper.infrastructure.article.HeadlineMediaResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -36,7 +37,8 @@ class CareerPoliticsArticlePublisherTest {
         try {
             CareerPoliticsArticlePublisher publisher = new CareerPoliticsArticlePublisher(
                     RestClient.create(),
-                    properties(false, "http://127.0.0.1:" + server.getAddress().getPort() + "/api/articles", "secret-token", 42L)
+                    properties(false, "http://127.0.0.1:" + server.getAddress().getPort() + "/api/articles", "secret-token", 42L),
+                    new HeadlineMediaResolver()
             );
             TrendingArticleRequest request = new TrendingArticleRequest();
             request.setPublish(true);
@@ -92,7 +94,8 @@ class CareerPoliticsArticlePublisherTest {
         try {
             CareerPoliticsArticlePublisher publisher = new CareerPoliticsArticlePublisher(
                     RestClient.create(),
-                    properties(true, "http://127.0.0.1:" + server.getAddress().getPort() + "/api/articles", "secret-token", null)
+                    properties(true, "http://127.0.0.1:" + server.getAddress().getPort() + "/api/articles", "secret-token", null),
+                    new HeadlineMediaResolver()
             );
 
             PublishingResult result = publisher.publish(

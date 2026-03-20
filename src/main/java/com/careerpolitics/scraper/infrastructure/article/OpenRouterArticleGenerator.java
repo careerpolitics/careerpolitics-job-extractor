@@ -21,15 +21,18 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
     private final ObjectMapper objectMapper;
     private final TrendingProperties properties;
     private final TemplateArticleGenerator fallbackGenerator;
+    private final HeadlineMediaResolver headlineMediaResolver;
 
     public OpenRouterArticleGenerator(RestClient restClient,
                                       ObjectMapper objectMapper,
                                       TrendingProperties properties,
-                                      TemplateArticleGenerator fallbackGenerator) {
+                                      TemplateArticleGenerator fallbackGenerator,
+                                      HeadlineMediaResolver headlineMediaResolver) {
         this.restClient = restClient;
         this.objectMapper = objectMapper;
         this.properties = properties;
         this.fallbackGenerator = fallbackGenerator;
+        this.headlineMediaResolver = headlineMediaResolver;
     }
 
     @Override
@@ -40,6 +43,7 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
     @Override
     public GeneratedArticleDraft generate(String trend, String language, List<TrendHeadline> headlines) {
         try {
+            GeneratedArticleDraft fallbackDraft = fallbackGenerator.generate(trend, language, headlines);
             String body = restClient.post()
                     .uri(properties.generation().openRouterBaseUrl() + "/chat/completions")
                     .contentType(MediaType.APPLICATION_JSON)
@@ -57,9 +61,9 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
             String content = root.at("/choices/0/message/content").asText();
             JsonNode article = objectMapper.readTree(extractJsonPayload(content));
             String title = article.path("title").asText(trend + " is trending: what matters now");
-            String markdown = article.path("markdown").asText(fallbackGenerator.generate(trend, language, headlines).markdown());
-            List<String> tags = List.copyOf(new LinkedHashSet<>(fallbackGenerator.generate(trend, language, headlines).tags()));
-            List<String> keywords = List.copyOf(new LinkedHashSet<>(fallbackGenerator.generate(trend, language, headlines).keywords()));
+            String markdown = article.path("markdown").asText(fallbackDraft.markdown());
+            List<String> tags = List.copyOf(new LinkedHashSet<>(fallbackDraft.tags()));
+            List<String> keywords = List.copyOf(new LinkedHashSet<>(fallbackDraft.keywords()));
             return new GeneratedArticleDraft(title, markdown, tags, keywords, "open-router");
         } catch (Exception exception) {
             return fallbackGenerator.generate(trend, language, headlines);
@@ -67,13 +71,7 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
     }
 
     private String buildPrompt(String trend, String language, List<TrendHeadline> headlines) {
-        String coverImage = headlines.stream()
-                .filter(headline -> headline.articleDetails() != null
-                        && headline.articleDetails().mediaUrls() != null
-                        && !headline.articleDetails().mediaUrls().isEmpty())
-                .flatMap(headline -> headline.articleDetails().mediaUrls().stream())
-                .findFirst()
-                .orElse("");
+        String coverImage = headlineMediaResolver.resolveCoverMediaUrl(headlines);
         String sourcesText = buildSourcesText(headlines);
         String mediaText = buildMediaText(headlines);
         return String.format("""
@@ -261,23 +259,10 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
     }
 
     private String buildMediaText(List<TrendHeadline> headlines) {
-        List<String> allMediaUrls = headlines.stream()
-                .filter(headline -> headline.articleDetails() != null && headline.articleDetails().mediaUrls() != null)
-                .flatMap(headline -> headline.articleDetails().mediaUrls().stream())
-                .distinct()
-                .toList();
         StringBuilder builder = new StringBuilder();
-        for (TrendHeadline headline : headlines) {
-            if (headline.articleDetails() == null || headline.articleDetails().mediaUrls() == null) {
-                continue;
-            }
-            for (String mediaUrl : headline.articleDetails().mediaUrls()) {
-                if (!allMediaUrls.isEmpty() && mediaUrl.equals(allMediaUrls.get(0)) && allMediaUrls.size() > 1) {
-                    continue;
-                }
-                builder.append("- ").append(safe(headline.articleDetails().mediaType()))
-                        .append(": ").append(safe(mediaUrl)).append("\n");
-            }
+        for (HeadlineMediaResolver.ResolvedMedia media : headlineMediaResolver.resolveAdditionalMedia(headlines, 6)) {
+            builder.append("- ").append(safe(media.type()))
+                    .append(": ").append(safe(media.url())).append("\n");
         }
         return builder.isEmpty() ? "n/a" : builder.toString();
     }

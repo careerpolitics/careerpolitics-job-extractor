@@ -8,23 +8,29 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TemplateArticleGeneratorTest {
 
     @Test
     void generateBuildsReadableMarkdownAndTags() {
-        TemplateArticleGenerator generator = new TemplateArticleGenerator(new TrendNormalizer());
+        TemplateArticleGenerator generator = new TemplateArticleGenerator(new TrendNormalizer(), new HeadlineMediaResolver());
 
         GeneratedArticleDraft draft = generator.generate(
                 "AI Jobs",
                 "en-US",
                 List.of(new TrendHeadline("AI Jobs", "Hiring expands", "https://example.com", "Reuters", null, "New hiring wave",
-                        new ArticleDetails("Hiring wave expands", "Detailed article content", List.of("https://example.com/image.jpg"), "image")))
+                        new ArticleDetails("Hiring wave expands", "Detailed article content", List.of(
+                                "https://example.com/cover.jpg",
+                                "https://example.com/video.mp4"
+                        ), "image")))
         );
 
         assertTrue(draft.markdown().contains("# AI Jobs"));
         assertTrue(draft.tags().contains("trending"));
         assertTrue(draft.keywords().contains("AI Jobs"));
+        assertTrue(draft.markdown().contains("https://example.com/video.mp4"));
+        assertFalse(draft.markdown().contains("https://example.com/cover.jpg"));
     }
 }
