@@ -21,7 +21,7 @@ public class TrendingScheduler {
         this.properties = properties;
     }
 
-    @Scheduled(cron = "${careerpolitics.trending.scheduler.cron:0 0 */6 * * *}")
+    @Scheduled(cron = "${careerpolitics.trending.scheduler.cron:0 0 * * * *}")
     public void run() {
         if (!properties.scheduler().enabled()) {
             return;

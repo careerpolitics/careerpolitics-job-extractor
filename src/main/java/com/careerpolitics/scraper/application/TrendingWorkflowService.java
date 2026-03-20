@@ -122,9 +122,8 @@ public class TrendingWorkflowService {
         }
 
         TrendingArticleResponse response = new TrendingArticleResponse(selectedTrends, deduplicateHeadlines(allHeadlines), articles, warnings);
-        log.info("Trending workflow completed with {} articles, {} unique headlines, {} warnings.",
+        log.info("Trending workflow completed with {} articles, {} warnings.",
                 response.articles().size(),
-                response.headlines().size(),
                 response.warnings().size());
         return response;
     }
