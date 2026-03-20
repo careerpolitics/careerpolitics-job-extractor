@@ -15,6 +15,7 @@ import org.springframework.web.client.RestClient;
 import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Slf4j
@@ -127,11 +128,20 @@ public class CareerPoliticsArticlePublisher implements ArticlePublisher {
             return "";
         }
         return tags.stream()
-                .map(String::trim)
+                .map(this::sanitizeTag)
                 .filter(tag -> !tag.isBlank())
                 .distinct()
                 .reduce((left, right) -> left + "," + right)
                 .orElse("");
+    }
+
+    private String sanitizeTag(String tag) {
+        if (tag == null) {
+            return "";
+        }
+        String normalized = tag.trim().toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9]+", "");
+        return normalized;
     }
 
     private String resolveMainImage(List<TrendHeadline> headlines) {

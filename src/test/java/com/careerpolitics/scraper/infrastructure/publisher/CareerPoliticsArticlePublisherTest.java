@@ -44,7 +44,7 @@ class CareerPoliticsArticlePublisherTest {
             PublishingResult result = publisher.publish(
                     "Example title",
                     "Example markdown",
-                    List.of("tag1", "tag2"),
+                    List.of("Tag One", "Tag@One", "tag2"),
                     "example-trend",
                     List.of(new TrendHeadline(
                             "example-trend",
@@ -70,7 +70,7 @@ class CareerPoliticsArticlePublisherTest {
                     .containsEntry("published", true)
                     .containsEntry("main_image", "https://example.com/story.jpg")
                     .containsEntry("description", "Example summary")
-                    .containsEntry("tags", "tag1,tag2")
+                    .containsEntry("tags", "tagone,tag2")
                     .containsEntry("organization_id", 42);
         } finally {
             server.stop(0);
