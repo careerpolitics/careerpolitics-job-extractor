@@ -33,11 +33,13 @@ The original browser-driven implementation was CPU-heavy because it used large s
 
 ## Manual Selenium verification on a local Docker browser
 
-If Google presents a bot-check while you run the browser with `SELENIUM_HEADLESS=false`, expose Selenium's noVNC port and open:
+If Google presents a bot-check while you run the browser with `SELENIUM_HEADLESS=false`, open:
 
 ```
 http://localhost:7900/?autoconnect=1&resize=scale
 ```
+
+By default, `docker-compose.yaml` now binds Selenium's WebDriver (`4444`) and noVNC (`7900`) ports to `127.0.0.1` only. That keeps the browser internal to the Docker host and prevents internet scanners from reaching Selenium directly on a public droplet. If you really need remote debugging from another machine, override `SELENIUM_HOST_BIND` and `SELENIUM_VNC_HOST_BIND` explicitly.
 
 Recommended local settings:
 
@@ -46,6 +48,8 @@ SELENIUM_HEADLESS=false
 SELENIUM_MANUAL_VERIFICATION_WAIT_ENABLED=true
 SELENIUM_MANUAL_VERIFICATION_MAX_WAIT_SECONDS=120
 SELENIUM_REMOTE_URL=http://localhost:4444/wd/hub
+SELENIUM_HOST_BIND=127.0.0.1
+SELENIUM_VNC_HOST_BIND=127.0.0.1
 ```
 
 Leave `SELENIUM_USER_AGENT` unset unless you intentionally need to spoof a specific browser version.
@@ -70,6 +74,8 @@ Leave `SELENIUM_USER_AGENT` unset unless you intentionally need to spoof a speci
 ## Recommended production settings
 
 - Keep `TRENDING_SCHEDULER_ENABLED=false` unless you need automated runs.
+- If you do enable the scheduler, prefer a six-hour cadence or slower to avoid repeated Chrome spikes on small droplets.
 - Keep `SELENIUM_HEADLESS=true` for servers.
 - Keep `SELENIUM_MAX_ATTEMPTS` low (`1` or `2`).
+- Do not publish Selenium ports (`4444`/`7900`) publicly unless you intentionally need remote debugging.
 - Keep container limits similar to `docker-compose.yaml`.
