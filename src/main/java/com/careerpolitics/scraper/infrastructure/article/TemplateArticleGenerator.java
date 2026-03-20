@@ -73,6 +73,20 @@ public class TemplateArticleGenerator implements ArticleGenerator {
                         .append(")\n");
             }
         }
+
+        List<String> mediaUrls = headlines.stream()
+                .filter(headline -> headline.articleDetails() != null && headline.articleDetails().mediaUrls() != null)
+                .flatMap(headline -> headline.articleDetails().mediaUrls().stream())
+                .distinct()
+                .skip(1)
+                .limit(2)
+                .toList();
+        if (!mediaUrls.isEmpty()) {
+            builder.append("\n## Related media\n\n");
+            for (String mediaUrl : mediaUrls) {
+                builder.append(mediaUrl).append("\n\n");
+            }
+        }
         return builder.toString();
     }
 

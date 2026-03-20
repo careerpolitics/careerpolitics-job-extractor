@@ -45,7 +45,7 @@ class TrendingWorkflowServiceTest {
 
         List<TrendHeadline> headlines = List.of(
                 new TrendHeadline("AI Jobs", "Hiring expands", "https://example.com/story", "Reuters", null, "Summary",
-                        new ArticleDetails("Summary", "Detailed content", "https://example.com/image.jpg", "image"))
+                        new ArticleDetails("Summary", "Detailed content", List.of("https://example.com/image.jpg"), "image"))
         );
         when(trendDiscoveryClient.discover(anyString(), anyString(), anyInt())).thenReturn(List.of("AI Jobs"));
         when(trendSelectionService.pickFreshTrends(anyList(), anyInt(), anyInt())).thenReturn(List.of("AI Jobs"));

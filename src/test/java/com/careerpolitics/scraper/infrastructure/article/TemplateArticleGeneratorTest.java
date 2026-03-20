@@ -20,7 +20,7 @@ class TemplateArticleGeneratorTest {
                 "AI Jobs",
                 "en-US",
                 List.of(new TrendHeadline("AI Jobs", "Hiring expands", "https://example.com", "Reuters", null, "New hiring wave",
-                        new ArticleDetails("Hiring wave expands", "Detailed article content", "https://example.com/image.jpg", "image")))
+                        new ArticleDetails("Hiring wave expands", "Detailed article content", List.of("https://example.com/image.jpg"), "image")))
         );
 
         assertTrue(draft.markdown().contains("# AI Jobs"));

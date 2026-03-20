@@ -70,18 +70,20 @@ public class JsoupTrendHeadlineDetailClient implements TrendHeadlineDetailClient
                 metaContent(document, "meta[name=description]"),
                 headline.summary()
         );
-        String mediaUrl = firstNonBlank(
-                metaContent(document, "meta[property=og:image]"),
-                metaContent(document, "meta[name=twitter:image]"),
-                metaContent(document, "meta[itemprop=image]"),
-                metaContent(document, "meta[property=og:video]"),
-                metaContent(document, "meta[property=og:video:url]"),
-                iframeSource(document),
-                headline.articleDetails() == null ? null : headline.articleDetails().mediaUrl()
-        );
-        String mediaType = inferMediaType(mediaUrl, document);
+        List<String> rawMediaCandidates = new ArrayList<>();
+        rawMediaCandidates.add(metaContent(document, "meta[property=og:image]"));
+        rawMediaCandidates.add(metaContent(document, "meta[name=twitter:image]"));
+        rawMediaCandidates.add(metaContent(document, "meta[itemprop=image]"));
+        rawMediaCandidates.add(metaContent(document, "meta[property=og:video]"));
+        rawMediaCandidates.add(metaContent(document, "meta[property=og:video:url]"));
+        rawMediaCandidates.add(iframeSource(document));
+        if (headline.articleDetails() != null && headline.articleDetails().mediaUrls() != null) {
+            rawMediaCandidates.addAll(headline.articleDetails().mediaUrls());
+        }
+        List<String> mediaUrls = sanitizeMediaUrls(rawMediaCandidates);
+        String mediaType = inferMediaType(mediaUrls.isEmpty() ? null : mediaUrls.get(0), document);
         String content = extractContent(document);
-        return new ArticleDetails(description, content, mediaUrl, mediaType);
+        return new ArticleDetails(description, content, mediaUrls, mediaType);
     }
 
     private String metaContent(Document document, String selector) {
@@ -152,5 +154,26 @@ public class JsoupTrendHeadlineDetailClient implements TrendHeadlineDetailClient
             }
         }
         return null;
+    }
+
+    private List<String> sanitizeMediaUrls(List<String> rawCandidates) {
+        LinkedHashSet<String> sanitized = new LinkedHashSet<>();
+        for (String rawCandidate : rawCandidates) {
+            if (rawCandidate == null || rawCandidate.isBlank()) {
+                continue;
+            }
+            for (String candidate : rawCandidate.split("\n")) {
+                String trimmed = candidate == null ? null : candidate.trim();
+                if (trimmed == null || trimmed.isBlank()) {
+                    continue;
+                }
+                String lower = trimmed.toLowerCase(Locale.ROOT);
+                if (lower.startsWith("data:")) {
+                    continue;
+                }
+                sanitized.add(trimmed);
+            }
+        }
+        return List.copyOf(sanitized);
     }
 }

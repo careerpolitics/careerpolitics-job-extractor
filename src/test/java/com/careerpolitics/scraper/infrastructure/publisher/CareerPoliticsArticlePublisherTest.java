@@ -53,7 +53,7 @@ class CareerPoliticsArticlePublisherTest {
                             "Reuters",
                             "2 hours ago",
                             "Example summary",
-                            new ArticleDetails("Example summary", "Long form content", "https://example.com/story.jpg", "image")
+                            new ArticleDetails("Example summary", "Long form content", List.of("https://example.com/story.jpg"), "image")
                     )),
                     request
             );
