@@ -53,15 +53,17 @@ public class CareerPoliticsArticlePublisher implements ArticlePublisher {
 
         Map<String, Object> articlePayload = new LinkedHashMap<>();
         articlePayload.put("title", title);
-        articlePayload.put("content", markdown);
-        articlePayload.put("tags", tags);
-        articlePayload.put("trend", trend);
+        articlePayload.put("body_markdown", markdown);
+        articlePayload.put("published", false);
+        articlePayload.put("series", "Trending");
+        articlePayload.put("main_image", "");
+        articlePayload.put("canonical_url", "");
+        articlePayload.put("description", buildDescription(title, trend));
+        articlePayload.put("tags", toTagString(tags));
+        articlePayload.put("organization_id", organizationId == null ? 0L : organizationId);
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("article", articlePayload);
-        if (organizationId != null) {
-            payload.put("organization_id", organizationId);
-        }
 
         try {
             log.info("Publishing trend='{}' to host='{}' organizationId={} tags={} contentLength={}",
@@ -106,5 +108,24 @@ public class CareerPoliticsArticlePublisher implements ArticlePublisher {
         }
         String singleLine = responseBody.replaceAll("\\s+", " ").trim();
         return singleLine.length() > 500 ? singleLine.substring(0, 500) + "..." : singleLine;
+    }
+
+    private String buildDescription(String title, String trend) {
+        if (title != null && !title.isBlank()) {
+            return title;
+        }
+        return trend == null || trend.isBlank() ? "Trending article" : "Trending article about " + trend;
+    }
+
+    private String toTagString(List<String> tags) {
+        if (tags == null || tags.isEmpty()) {
+            return "";
+        }
+        return tags.stream()
+                .map(String::trim)
+                .filter(tag -> !tag.isBlank())
+                .distinct()
+                .reduce((left, right) -> left + "," + right)
+                .orElse("");
     }
 }
