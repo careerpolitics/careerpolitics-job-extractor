@@ -4,14 +4,18 @@ import com.careerpolitics.scraper.config.TrendingProperties;
 import com.careerpolitics.scraper.domain.model.PublishingResult;
 import com.careerpolitics.scraper.domain.port.ArticlePublisher;
 import com.careerpolitics.scraper.domain.request.TrendingArticleRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
+import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Component
 public class CareerPoliticsArticlePublisher implements ArticlePublisher {
 
@@ -30,6 +34,7 @@ public class CareerPoliticsArticlePublisher implements ArticlePublisher {
                                     String trend,
                                     TrendingArticleRequest request) {
         if (!properties.publishing().enabled()) {
+            log.info("Skipping publishing for trend='{}' because publishing is disabled.", trend);
             return PublishingResult.skipped("Publishing is disabled by configuration.");
         }
 
@@ -42,29 +47,64 @@ public class CareerPoliticsArticlePublisher implements ArticlePublisher {
                 : properties.publishing().organizationId();
 
         if (endpoint == null || endpoint.isBlank() || token == null || token.isBlank()) {
+            log.warn("Skipping publishing for trend='{}' because endpoint or token is missing.", trend);
             return new PublishingResult(false, "Article API URL or token is missing.", null);
         }
 
+        Map<String, Object> articlePayload = new LinkedHashMap<>();
+        articlePayload.put("title", title);
+        articlePayload.put("content", markdown);
+        articlePayload.put("tags", tags);
+        articlePayload.put("trend", trend);
+
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("title", title);
-        payload.put("content", markdown);
-        payload.put("tags", tags);
-        payload.put("trend", trend);
+        payload.put("article", articlePayload);
         if (organizationId != null) {
             payload.put("organization_id", organizationId);
         }
 
         try {
+            log.info("Publishing trend='{}' to host='{}' organizationId={} tags={} contentLength={}",
+                    trend,
+                    resolveHost(endpoint),
+                    organizationId,
+                    tags == null ? 0 : tags.size(),
+                    markdown == null ? 0 : markdown.length());
             restClient.post()
                     .uri(endpoint)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .header("Authorization", "Bearer " + token)
+                    .header("api-key", token)
                     .body(payload)
                     .retrieve()
                     .toBodilessEntity();
+            log.info("Publishing succeeded for trend='{}'.", trend);
             return new PublishingResult(true, "Published successfully.", null);
+        } catch (HttpClientErrorException exception) {
+            log.error("Publishing failed for trend='{}' with status={} responseBody={}",
+                    trend,
+                    exception.getStatusCode().value(),
+                    sanitizeResponseBody(exception.getResponseBodyAsString()));
+            return new PublishingResult(false, exception.getMessage(), null);
         } catch (Exception exception) {
+            log.error("Publishing failed for trend='{}': {}", trend, exception.getMessage(), exception);
             return new PublishingResult(false, exception.getMessage(), null);
         }
+    }
+
+    private String resolveHost(String endpoint) {
+        try {
+            String host = URI.create(endpoint).getHost();
+            return host == null || host.isBlank() ? "unknown" : host;
+        } catch (Exception exception) {
+            return "invalid-uri";
+        }
+    }
+
+    private String sanitizeResponseBody(String responseBody) {
+        if (responseBody == null || responseBody.isBlank()) {
+            return "<empty>";
+        }
+        String singleLine = responseBody.replaceAll("\\s+", " ").trim();
+        return singleLine.length() > 500 ? singleLine.substring(0, 500) + "..." : singleLine;
     }
 }
