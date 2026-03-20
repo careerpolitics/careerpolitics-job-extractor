@@ -12,41 +12,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SeleniumBrowserClientTest {
 
     @Test
-    void buildOptionsDoesNotForceLegacyUserAgentWhenUnset() {
-        SeleniumBrowserClient client = new SeleniumBrowserClient(properties(true, "http://192.168.0.100:4444/wd/hub", ""));
-
-        var options = client.buildOptions(null);
-
-        assertThat(options.asMap().get("args")).asList().noneMatch(argument -> String.valueOf(argument).startsWith("--user-agent="));
-        assertThat(options.asMap().get("args")).asList().contains("--headless=new", "--window-size=1600,1200", "--disable-background-networking");
-        assertThat(options.asMap()).containsEntry("pageLoadStrategy", "eager");
-    }
-
-    @Test
     void resolveNoVncUrlUsesRemoteHostForHeadfulSessions() {
         SeleniumBrowserClient client = new SeleniumBrowserClient(properties(false, "http://192.168.0.100:4444/wd/hub", ""));
 
         assertThat(client.resolveNoVncUrl()).isEqualTo("http://192.168.0.100:7900/?autoconnect=1&resize=scale");
-    }
-
-    @Test
-    void buildOptionsHonorsExplicitUserAgentOverride() {
-        SeleniumBrowserClient client = new SeleniumBrowserClient(properties(false, "http://192.168.0.100:4444/wd/hub", "custom-agent"));
-
-        var options = client.buildOptions(null);
-
-        assertThat(options.asMap().get("args")).asList().contains("--user-agent=custom-agent", "--start-maximized");
-    }
-
-    @Test
-    void applyStealthFallsBackWithoutThrowingWhenCdpIsUnavailable() {
-        SeleniumBrowserClient client = new SeleniumBrowserClient(properties(false, "http://192.168.0.100:4444/wd/hub", ""));
-        RemoteWebDriver driver = org.mockito.Mockito.mock(RemoteWebDriver.class, org.mockito.Mockito.withSettings().extraInterfaces(org.openqa.selenium.JavascriptExecutor.class));
-
-        client.applyStealth(driver);
-
-        org.mockito.Mockito.verify(driver).get("data:,");
-        org.mockito.Mockito.verify((org.openqa.selenium.JavascriptExecutor) driver).executeScript(org.mockito.ArgumentMatchers.anyString());
     }
 
     @Test

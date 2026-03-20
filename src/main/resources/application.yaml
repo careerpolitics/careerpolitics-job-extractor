@@ -7,13 +7,15 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: ${DB_POOL_MAX_SIZE:4}
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:3}
       minimum-idle: ${DB_POOL_MIN_IDLE:1}
   jpa:
     hibernate:
       ddl-auto: update
     open-in-view: false
     show-sql: false
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+
   jackson:
     default-property-inclusion: non_null
 
@@ -46,20 +48,20 @@ careerpolitics:
       open-router-api-key: ${OPENROUTER_API_KEY:}
       timeout: ${OPENROUTER_TIMEOUT:20s}
     publishing:
-      enabled: ${CAREERPOLITICS_PUBLISHING_ENABLED:false}
+      enabled: ${CAREERPOLITICS_PUBLISHING_ENABLED:true}
       article-api-url: ${CAREERPOLITICS_ARTICLE_API_URL:}
       article-api-token: ${CAREERPOLITICS_ARTICLE_API_TOKEN:}
       organization-id: ${CAREERPOLITICS_ARTICLE_ORGANIZATION_ID:}
       timeout: ${CAREERPOLITICS_ARTICLE_API_TIMEOUT:10s}
     scheduler:
-      enabled: ${TRENDING_SCHEDULER_ENABLED:false}
-      cron: ${TRENDING_SCHEDULER_CRON:0 0 */6 * * *}
+      enabled: ${TRENDING_SCHEDULER_ENABLED:true}
+      cron: ${TRENDING_SCHEDULER_CRON:0 0 * * * *}
       geo: ${TRENDING_SCHEDULER_GEO:IN}
       language: ${TRENDING_SCHEDULER_LANGUAGE:en-IN}
       max-trends: ${TRENDING_SCHEDULER_MAX_TRENDS:3}
-      max-news-per-trend: ${TRENDING_SCHEDULER_MAX_NEWS_PER_TREND:4}
-      trend-cooldown-hours: ${TRENDING_SCHEDULER_TREND_COOLDOWN_HOURS:24}
-      publish: ${TRENDING_SCHEDULER_PUBLISH:false}
+      max-news-per-trend: ${TRENDING_SCHEDULER_MAX_NEWS_PER_TREND:5}
+      trend-cooldown-hours: ${TRENDING_SCHEDULER_TREND_COOLDOWN_HOURS:48}
+      publish: ${TRENDING_SCHEDULER_PUBLISH:true}
 
 
 api:

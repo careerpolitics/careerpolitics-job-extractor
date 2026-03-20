@@ -6,6 +6,7 @@ public record TrendHeadline(
         String link,
         String source,
         String publishedAt,
-        String summary
+        String summary,
+        ArticleDetails articleDetails
 ) {
 }

@@ -25,11 +25,11 @@ services:
           memory: 384M
 
   selenium:
-    image: selenium/standalone-chrome:127.0
+    image: selenium/standalone-chrome:latest
     container_name: careerpolitics-selenium
     ports:
-      - "4444:4444"
-      - "7900:7900"
+      - "127.0.0.1:4444:4444"
+      - "127.0.0.1:7900:7900"
     shm_size: 1g
     environment:
       SE_VNC_NO_PASSWORD: 1

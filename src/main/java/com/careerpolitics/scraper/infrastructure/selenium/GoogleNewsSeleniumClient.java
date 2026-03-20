@@ -2,6 +2,7 @@ package com.careerpolitics.scraper.infrastructure.selenium;
 
 import com.careerpolitics.scraper.application.TrendNormalizer;
 import com.careerpolitics.scraper.config.TrendingProperties;
+import com.careerpolitics.scraper.domain.model.ArticleDetails;
 import com.careerpolitics.scraper.domain.model.TrendHeadline;
 import com.careerpolitics.scraper.domain.port.TrendNewsClient;
 import lombok.extern.slf4j.Slf4j;
@@ -13,8 +14,11 @@ import org.springframework.stereotype.Component;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 
 @Slf4j
 @Component
@@ -57,6 +61,7 @@ public class GoogleNewsSeleniumClient implements TrendNewsClient {
             String source = extractText(card, ".CEMjEf span, .NUnG9d span, .XTjFC, cite");
             String publishedAt = extractText(card, "time, .OSrXXb, .ZE0LJd span");
             String summary = extractText(card, ".GI74Re, .Y3v8qd, .st");
+            String media = extractMediaUrl(card);
             if (title.isBlank() || link.isBlank()) {
                 continue;
             }
@@ -66,7 +71,13 @@ public class GoogleNewsSeleniumClient implements TrendNewsClient {
                     link,
                     source.isBlank() ? "Google News" : trendNormalizer.clean(source),
                     publishedAt.isBlank() ? null : trendNormalizer.clean(publishedAt),
-                    summary.isBlank() ? null : trendNormalizer.clean(summary)
+                    summary.isBlank() ? null : trendNormalizer.clean(summary),
+                    new ArticleDetails(
+                            summary.isBlank() ? null : trendNormalizer.clean(summary),
+                            null,
+                            sanitizeMediaUrls(media == null ? List.of() : List.of(media)),
+                            inferMediaType(media)
+                    )
             ));
         }
         return unique.values().stream().limit(Math.max(1, maxNewsPerTrend)).toList();
@@ -97,6 +108,61 @@ public class GoogleNewsSeleniumClient implements TrendNewsClient {
     private String extractLink(Element root) {
         Element anchor = root.selectFirst("a[href]");
         return anchor == null ? "" : anchor.absUrl("href");
+    }
+
+    private String extractMediaUrl(Element root) {
+        Element image = root.selectFirst("img[src], img[data-src], img[data-iurl], img[srcset]");
+        if (image == null) {
+            return null;
+        }
+        for (String attribute : List.of("src", "data-src", "data-iurl")) {
+            String value = image.absUrl(attribute);
+            if (!value.isBlank()) {
+                return value;
+            }
+            value = image.attr(attribute);
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        String srcSet = image.attr("srcset");
+        if (srcSet == null || srcSet.isBlank()) {
+            return null;
+        }
+        String candidate = srcSet.split(",")[0].trim().split("\\s+")[0];
+        return candidate.isBlank() ? null : candidate;
+    }
+
+    private String inferMediaType(String mediaUrl) {
+        if (mediaUrl == null || mediaUrl.isBlank()) {
+            return null;
+        }
+        String lower = mediaUrl.toLowerCase(Locale.ROOT);
+        if (lower.endsWith(".gif") || lower.contains(".gif?")) {
+            return "gif";
+        }
+        if (lower.contains("youtube.com") || lower.contains("youtu.be")) {
+            return "youtube";
+        }
+        if (lower.endsWith(".mp4") || lower.contains(".mp4?")) {
+            return "video";
+        }
+        return "image";
+    }
+
+    private List<String> sanitizeMediaUrls(List<String> rawUrls) {
+        LinkedHashSet<String> sanitized = new LinkedHashSet<>();
+        for (String rawUrl : rawUrls) {
+            if (rawUrl == null || rawUrl.isBlank()) {
+                continue;
+            }
+            String trimmed = rawUrl.trim();
+            if (trimmed.toLowerCase(Locale.ROOT).startsWith("data:")) {
+                continue;
+            }
+            sanitized.add(trimmed);
+        }
+        return new ArrayList<>(sanitized);
     }
 
     private String encode(String value) {
