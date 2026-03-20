@@ -50,12 +50,12 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
                                     Map.of("role", "system", "content", "Return only JSON with title and markdown fields."),
                                     Map.of("role", "user", "content", buildPrompt(trend, language, headlines))
                             )
-                    ))
+            ))
                     .retrieve()
                     .body(String.class);
             JsonNode root = objectMapper.readTree(body);
             String content = root.at("/choices/0/message/content").asText();
-            JsonNode article = objectMapper.readTree(content);
+            JsonNode article = objectMapper.readTree(extractJsonPayload(content));
             String title = article.path("title").asText(trend + " is trending: what matters now");
             String markdown = article.path("markdown").asText(fallbackGenerator.generate(trend, language, headlines).markdown());
             List<String> tags = List.copyOf(new LinkedHashSet<>(fallbackGenerator.generate(trend, language, headlines).tags()));
@@ -284,5 +284,27 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
 
     private String safe(String value) {
         return value == null || value.isBlank() ? "n/a" : value;
+    }
+
+    String extractJsonPayload(String content) {
+        if (content == null) {
+            return "{}";
+        }
+        String trimmed = content.trim();
+        if (trimmed.startsWith("```")) {
+            int firstLineBreak = trimmed.indexOf('\n');
+            if (firstLineBreak >= 0) {
+                trimmed = trimmed.substring(firstLineBreak + 1);
+            }
+            if (trimmed.endsWith("```")) {
+                trimmed = trimmed.substring(0, trimmed.length() - 3).trim();
+            }
+        }
+        int firstBrace = trimmed.indexOf('{');
+        int lastBrace = trimmed.lastIndexOf('}');
+        if (firstBrace >= 0 && lastBrace > firstBrace) {
+            return trimmed.substring(firstBrace, lastBrace + 1);
+        }
+        return trimmed;
     }
 }
