@@ -1,6 +1,5 @@
 package com.careerpolitics.scraper.infrastructure.article;
 
-import com.careerpolitics.scraper.application.TrendNormalizer;
 import com.careerpolitics.scraper.config.TrendingProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestClient;
@@ -18,7 +17,6 @@ class OpenRouterArticleGeneratorTest {
                 RestClient.create(),
                 new com.fasterxml.jackson.databind.ObjectMapper(),
                 properties(),
-                new TemplateArticleGenerator(new TrendNormalizer(), new HeadlineMediaResolver()),
                 new HeadlineMediaResolver()
         );
 
@@ -42,7 +40,6 @@ class OpenRouterArticleGeneratorTest {
                 RestClient.create(),
                 new com.fasterxml.jackson.databind.ObjectMapper(),
                 properties(),
-                new TemplateArticleGenerator(new TrendNormalizer(), new HeadlineMediaResolver()),
                 new HeadlineMediaResolver()
         );
 
@@ -52,21 +49,20 @@ class OpenRouterArticleGeneratorTest {
     }
 
     @Test
-    void sanitizeTermsNormalizesAndDeduplicatesAiMetadata() throws Exception {
+    void sanitizeTermsDeduplicatesAndCapsAtFourTags() throws Exception {
         OpenRouterArticleGenerator generator = new OpenRouterArticleGenerator(
                 RestClient.create(),
                 new com.fasterxml.jackson.databind.ObjectMapper(),
                 properties(),
-                new TemplateArticleGenerator(new TrendNormalizer(), new HeadlineMediaResolver()),
                 new HeadlineMediaResolver()
         );
 
         var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-        var tags = mapper.readTree("[\"AI Jobs\",\"ai-jobs\",\"Policy Update!\"]");
+        var tags = mapper.readTree("[\"AI Jobs\",\"AI Jobs\",\"Policy Update\",\"Govt Exams\",\"Results\",\"Extra\"]");
         var keywords = mapper.readTree("[\"AI Jobs\",\"AI Jobs\",\"Policy update\"]");
 
-        assertThat(generator.sanitizeTerms(tags, 8, true)).containsExactly("ai-jobs", "policy-update");
-        assertThat(generator.sanitizeTerms(keywords, 10, false)).containsExactly("AI Jobs", "Policy update");
+        assertThat(generator.sanitizeTerms(tags, 4)).containsExactly("AI Jobs", "Policy Update", "Govt Exams", "Results");
+        assertThat(generator.sanitizeTerms(keywords, 10)).containsExactly("AI Jobs", "Policy update");
     }
 
     private TrendingProperties properties() {

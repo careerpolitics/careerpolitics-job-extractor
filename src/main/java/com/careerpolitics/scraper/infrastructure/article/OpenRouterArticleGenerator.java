@@ -4,6 +4,7 @@ import com.careerpolitics.scraper.config.TrendingProperties;
 import com.careerpolitics.scraper.domain.model.GeneratedArticleDraft;
 import com.careerpolitics.scraper.domain.model.TrendHeadline;
 import com.careerpolitics.scraper.domain.port.ArticleGenerator;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.MediaType;
@@ -20,65 +21,56 @@ import java.util.Objects;
 @Component
 public class OpenRouterArticleGenerator implements ArticleGenerator {
 
-    private static final int MAX_TAGS = 8;
+    private static final int MAX_TAGS = 4;
     private static final int MAX_KEYWORDS = 10;
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
     private final TrendingProperties properties;
-    private final TemplateArticleGenerator fallbackGenerator;
     private final HeadlineMediaResolver headlineMediaResolver;
 
     public OpenRouterArticleGenerator(RestClient restClient,
                                       ObjectMapper objectMapper,
                                       TrendingProperties properties,
-                                      TemplateArticleGenerator fallbackGenerator,
                                       HeadlineMediaResolver headlineMediaResolver) {
         this.restClient = restClient;
         this.objectMapper = objectMapper;
         this.properties = properties;
-        this.fallbackGenerator = fallbackGenerator;
         this.headlineMediaResolver = headlineMediaResolver;
     }
 
     @Override
-    public boolean supportsAi() {
-        return true;
-    }
-
-    @Override
     public GeneratedArticleDraft generate(String trend, String language, List<TrendHeadline> headlines) {
+        String body = restClient.post()
+                .uri(properties.generation().openRouterBaseUrl() + "/chat/completions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + properties.generation().openRouterApiKey())
+                .body(Map.of(
+                        "model", properties.generation().openRouterModel(),
+                        "messages", List.of(
+                                Map.of("role", "system", "content", "Return only valid JSON with title, markdown, tags, and keywords fields."),
+                                Map.of("role", "user", "content", buildPrompt(trend, language, headlines))
+                        )
+                ))
+                .retrieve()
+                .body(String.class);
         try {
-            GeneratedArticleDraft fallbackDraft = fallbackGenerator.generate(trend, language, headlines);
-            String body = restClient.post()
-                    .uri(properties.generation().openRouterBaseUrl() + "/chat/completions")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .header("Authorization", "Bearer " + properties.generation().openRouterApiKey())
-                    .body(Map.of(
-                            "model", properties.generation().openRouterModel(),
-                            "messages", List.of(
-                                    Map.of("role", "system", "content", "Return only valid JSON with title, markdown, tags, and keywords fields."),
-                                    Map.of("role", "user", "content", buildPrompt(trend, language, headlines))
-                            )
-                    ))
-                    .retrieve()
-                    .body(String.class);
             JsonNode root = objectMapper.readTree(body);
             String content = root.at("/choices/0/message/content").asText();
             JsonNode article = objectMapper.readTree(extractJsonPayload(content));
-            String title = article.path("title").asText(trend + " is trending: what matters now");
-            String markdown = article.path("markdown").asText(fallbackDraft.markdown());
-            List<String> tags = sanitizeTerms(article.path("tags"), MAX_TAGS, true);
-            List<String> keywords = sanitizeTerms(article.path("keywords"), MAX_KEYWORDS, false);
+            String title = requiredText(article, "title");
+            String markdown = requiredText(article, "markdown");
+            List<String> tags = sanitizeTerms(article.path("tags"), MAX_TAGS);
+            List<String> keywords = sanitizeTerms(article.path("keywords"), MAX_KEYWORDS);
             if (tags.isEmpty()) {
-                tags = fallbackDraft.tags();
+                throw new IllegalStateException("AI response did not include usable tags.");
             }
             if (keywords.isEmpty()) {
-                keywords = fallbackDraft.keywords();
+                throw new IllegalStateException("AI response did not include usable keywords.");
             }
             return new GeneratedArticleDraft(title, markdown, tags, keywords, "open-router");
-        } catch (Exception exception) {
-            return fallbackGenerator.generate(trend, language, headlines);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Failed to parse AI article response.", exception);
         }
     }
 
@@ -86,25 +78,23 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
         String sourcesText = buildSourcesText(headlines);
         String mediaText = buildMediaText(headlines);
         return String.format("""
-                You are a senior journalist writing a clean, useful article for CareerPolitics.com.
+                You are writing a polished article for CareerPolitics.com.
 
-                TREND: %s
+                Trend: %s
                 Language: %s
 
-                Write an original article that focuses on the most useful angle for readers based on the source material.
-                Keep it factual, concise, and easy to scan.
+                Write one complete article in valid Forem markdown.
+                The output must be simple, clean, factual, and non-repetitive.
 
-                Requirements:
-                - Use the provided article template structure.
-                - Do not mention code, prompts, generation steps, or AI.
-                - Do not include any extra metadata fields beyond title, markdown, tags, and keywords.
-                - Do not include promotional lines, marketing copy, Telegram mentions, or calls to join/follow/subscribe.
-                - Keep the article simple and clean.
-                - Avoid repetition across sections.
-                - If information is unclear, say: "As of now, no official confirmation is available."
-                - Use only the provided source material. Do not invent facts.
+                Hard requirements:
+                - Use only the supplied source material.
+                - Do not mention AI, prompts, generation steps, or code.
+                - Do not include promotional lines, subscription prompts, Telegram mentions, or marketing copy.
+                - Do not include any extra fields beyond title, markdown, tags, and keywords.
+                - If a fact is unclear or unconfirmed, say: "As of now, no official confirmation is available."
+                - Do not invent facts.
 
-                Article structure:
+                Article template:
                 ## Overview
                 ## Why This Is Trending
                 ## Key Updates
@@ -113,26 +103,30 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
                 ## FAQ
 
                 Formatting rules:
-                - Start body sections with ## headings only.
-                - Use short paragraphs and bullets where helpful.
-                - Use at most one card block, up to two details blocks, and one table only if they add value.
+                - Use ## headings only.
+                - Use short paragraphs.
+                - Use bullets only when they improve clarity.
+                - Use at most one table, only if it adds value.
+                - Use at most two details blocks, only if they add value.
                 - Do not use CTA blocks.
-                - Use media only when genuinely relevant.
-                - Keep markdown valid for Forem.
+                - Use media only when genuinely useful to the article.
+                - Keep the markdown readable and publication-ready.
 
                 Tags and keywords rules:
-                - Decide the most appropriate tags and keywords yourself from the article content.
-                - Keep them relevant, concise, lowercase where appropriate, and properly formatted for Forem.
-                - Do not repeat or closely duplicate tags or keywords.
-                - Return up to 8 tags and up to 10 keywords.
+                - You must choose them yourself based on the article you write.
+                - Return exactly 1 to 4 tags.
+                - Tags must be concise, relevant, Forem-friendly, and non-duplicative.
+                - Return 1 to 10 keywords.
+                - Keywords must be relevant, concise, and non-duplicative.
+                - Do not repeat the same wording across tags and keywords unless it is clearly necessary.
 
-                Provided sources:
+                Source material:
                 %s
 
                 Relevant media:
                 %s
 
-                Return ONLY valid JSON in this shape:
+                Return ONLY valid JSON in this exact shape:
                 {
                   "title": "Clear article title",
                   "markdown": "Full article in markdown",
@@ -142,26 +136,21 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
                 """, trend, language, sourcesText, mediaText);
     }
 
-    List<String> sanitizeTerms(JsonNode node, int maxTerms, boolean slugify) {
+    List<String> sanitizeTerms(JsonNode node, int maxTerms) {
         if (node == null || !node.isArray()) {
             return List.of();
         }
         LinkedHashSet<String> values = new LinkedHashSet<>();
         for (JsonNode item : node) {
-            String value = item.asText("");
-            if (value == null) {
-                continue;
-            }
-            String normalized = value.trim();
-            if (normalized.isBlank()) {
-                continue;
-            }
-            normalized = slugify ? toForemTag(normalized) : normalized.replaceAll("\\s+", " ");
+            String normalized = item.asText("").replaceAll("\\s+", " ").trim();
             if (normalized.isBlank()) {
                 continue;
             }
             String uniquenessKey = normalized.toLowerCase(Locale.ROOT);
-            if (values.stream().map(existing -> existing.toLowerCase(Locale.ROOT)).anyMatch(uniquenessKey::equals)) {
+            boolean duplicate = values.stream()
+                    .map(existing -> existing.toLowerCase(Locale.ROOT))
+                    .anyMatch(uniquenessKey::equals);
+            if (duplicate) {
                 continue;
             }
             values.add(normalized);
@@ -172,16 +161,12 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
         return new ArrayList<>(values);
     }
 
-    private String toForemTag(String value) {
-        String normalized = value.toLowerCase(Locale.ROOT)
-                .replaceAll("[^a-z0-9\\s-]", " ")
-                .replaceAll("\\s+", "-")
-                .replaceAll("-+", "-")
-                .replaceAll("^-|-$", "");
-        if (normalized.length() > 20) {
-            normalized = normalized.substring(0, 20).replaceAll("-+$", "");
+    private String requiredText(JsonNode article, String fieldName) {
+        String value = article.path(fieldName).asText("").trim();
+        if (value.isBlank()) {
+            throw new IllegalStateException("AI response did not include a usable " + fieldName + ".");
         }
-        return normalized;
+        return value;
     }
 
     private String buildSourcesText(List<TrendHeadline> headlines) {
@@ -200,9 +185,10 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
     }
 
     private String buildMediaText(List<TrendHeadline> headlines) {
-        return headlineMediaResolver.resolveAdditionalMedia(headlines, 3).stream()
-                .map(media -> "- " + media.url())
+        String media = headlineMediaResolver.resolveAdditionalMedia(headlines, 3).stream()
+                .map(mediaItem -> "- " + mediaItem.url())
                 .reduce("", (left, right) -> left + right + "\n");
+        return media.isBlank() ? "- No additional media supplied." : media;
     }
 
     private String safe(String value) {
