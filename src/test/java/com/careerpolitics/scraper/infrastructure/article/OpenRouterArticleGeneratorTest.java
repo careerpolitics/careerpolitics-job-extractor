@@ -51,6 +51,24 @@ class OpenRouterArticleGeneratorTest {
         assertThat(payload).isEqualTo("{\"title\":\"Example\",\"markdown\":\"Body\"}");
     }
 
+    @Test
+    void sanitizeTermsNormalizesAndDeduplicatesAiMetadata() throws Exception {
+        OpenRouterArticleGenerator generator = new OpenRouterArticleGenerator(
+                RestClient.create(),
+                new com.fasterxml.jackson.databind.ObjectMapper(),
+                properties(),
+                new TemplateArticleGenerator(new TrendNormalizer(), new HeadlineMediaResolver()),
+                new HeadlineMediaResolver()
+        );
+
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var tags = mapper.readTree("[\"AI Jobs\",\"ai-jobs\",\"Policy Update!\"]");
+        var keywords = mapper.readTree("[\"AI Jobs\",\"AI Jobs\",\"Policy update\"]");
+
+        assertThat(generator.sanitizeTerms(tags, 8, true)).containsExactly("ai-jobs", "policy-update");
+        assertThat(generator.sanitizeTerms(keywords, 10, false)).containsExactly("AI Jobs", "Policy update");
+    }
+
     private TrendingProperties properties() {
         return new TrendingProperties(
                 new TrendingProperties.Discovery("https://trends.google.com/trending", 5, List.of()),

@@ -27,14 +27,14 @@ class TemplateArticleGeneratorTest {
                         ), "image")))
         );
 
-        assertTrue(draft.markdown().contains("# AI Jobs"));
-        assertTrue(draft.tags().contains("trending"));
+        assertTrue(draft.markdown().contains("## Overview"));
+        assertTrue(draft.tags().contains("jobs"));
         assertTrue(draft.keywords().contains("AI Jobs"));
         assertTrue(draft.markdown().contains("https://example.com/video.mp4"));
         assertFalse(draft.markdown().contains("https://example.com/cover.jpg"));
         assertTrue(draft.markdown().contains("## Table Of Contents"));
         assertTrue(draft.markdown().contains("{% card %}"));
-        assertTrue(draft.markdown().contains("{% cta https://careerpolitics.com %}"));
+        assertFalse(draft.markdown().contains("{% cta"));
         assertTrue(draft.markdown().contains("{% details"));
     }
 }

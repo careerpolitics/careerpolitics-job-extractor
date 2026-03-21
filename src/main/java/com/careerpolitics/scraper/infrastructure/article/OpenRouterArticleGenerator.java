@@ -10,12 +10,18 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 
 @Component
 public class OpenRouterArticleGenerator implements ArticleGenerator {
+
+    private static final int MAX_TAGS = 8;
+    private static final int MAX_KEYWORDS = 10;
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
@@ -51,10 +57,10 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
                     .body(Map.of(
                             "model", properties.generation().openRouterModel(),
                             "messages", List.of(
-                                    Map.of("role", "system", "content", "Return only JSON with title and markdown fields."),
+                                    Map.of("role", "system", "content", "Return only valid JSON with title, markdown, tags, and keywords fields."),
                                     Map.of("role", "user", "content", buildPrompt(trend, language, headlines))
                             )
-            ))
+                    ))
                     .retrieve()
                     .body(String.class);
             JsonNode root = objectMapper.readTree(body);
@@ -62,8 +68,14 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
             JsonNode article = objectMapper.readTree(extractJsonPayload(content));
             String title = article.path("title").asText(trend + " is trending: what matters now");
             String markdown = article.path("markdown").asText(fallbackDraft.markdown());
-            List<String> tags = List.copyOf(new LinkedHashSet<>(fallbackDraft.tags()));
-            List<String> keywords = List.copyOf(new LinkedHashSet<>(fallbackDraft.keywords()));
+            List<String> tags = sanitizeTerms(article.path("tags"), MAX_TAGS, true);
+            List<String> keywords = sanitizeTerms(article.path("keywords"), MAX_KEYWORDS, false);
+            if (tags.isEmpty()) {
+                tags = fallbackDraft.tags();
+            }
+            if (keywords.isEmpty()) {
+                keywords = fallbackDraft.keywords();
+            }
             return new GeneratedArticleDraft(title, markdown, tags, keywords, "open-router");
         } catch (Exception exception) {
             return fallbackGenerator.generate(trend, language, headlines);
@@ -71,182 +83,105 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
     }
 
     private String buildPrompt(String trend, String language, List<TrendHeadline> headlines) {
-        String coverImage = headlineMediaResolver.resolveCoverMediaUrl(headlines);
         String sourcesText = buildSourcesText(headlines);
         String mediaText = buildMediaText(headlines);
         return String.format("""
-                You are a senior investigative journalist and SEO strategist writing for CareerPolitics.com — a platform focused on government jobs, exams, and policy updates.
-
-                Your job is to create original, human-like, high-authority content optimized for:
-                • Google ranking
-                • Click-through rate (CTR)
-                • Dwell time
-                • Aspirant usefulness
-
-                ---
-
-                ## OBJECTIVE
+                You are a senior journalist writing a clean, useful article for CareerPolitics.com.
 
                 TREND: %s
                 Language: %s
 
-                Write a high-quality article that:
-                • Solves real search intent (jobs, exams, results, dates)
-                • Provides actionable insights
-                • Avoids generic AI writing
+                Write an original article that focuses on the most useful angle for readers based on the source material.
+                Keep it factual, concise, and easy to scan.
 
-                Use sources as input, but merge them into one cohesive story.
+                Requirements:
+                - Use the provided article template structure.
+                - Do not mention code, prompts, generation steps, or AI.
+                - Do not include any extra metadata fields beyond title, markdown, tags, and keywords.
+                - Do not include promotional lines, marketing copy, Telegram mentions, or calls to join/follow/subscribe.
+                - Keep the article simple and clean.
+                - Avoid repetition across sections.
+                - If information is unclear, say: "As of now, no official confirmation is available."
+                - Use only the provided source material. Do not invent facts.
 
-                ---
-
-                ## STEP 1 — CHOOSE ANGLE (MANDATORY)
-
-                Pick ONE:
-                • Recruitment / exam notification
-                • Policy impact
-                • Timeline change
-                • Controversy
-                • Opportunity for aspirants
-
-                Stick to it throughout.
-
-                ---
-
-                ## STEP 2 — ANTI-AI RULES
-
-                STRICT:
-                • No source-by-source summary
-                • No repetitive phrases ("In today's world", etc.)
-                • No fluff
-                • Use natural transitions
-                • Write like a journalist, not AI
-
-                ---
-
-                ## STEP 3 — FOREM FEATURES (MANDATORY USAGE)
-
-                You MUST include:
-
-                1. At least 1 CARD block
-                {%% card %%}
-                📅 Important Date
-                💰 Salary / Key Info
-                📢 Critical Update
-                {%% endcard %%}
-
-                2. At least 2 CTA blocks
-                (after intro + before conclusion)
-                {%% cta https://careerpolitics.com %%}
-                Join our Telegram for job alerts
-                {%% endcta %%}
-
-                3. At least 2 DETAILS blocks
-                (for FAQ / syllabus / eligibility)
-
-                4. At least 1 TABLE
-                (for dates / salary / vacancies)
-
-                5. Optional embeds
-                Use raw media URLs (YouTube / GIF / image / video) if relevant.
-                Use one strong visual as the cover image and consider other relevant media in markdown only when it genuinely helps the article.
-                Always use Forem-compatible syntax:
-                • Images/GIFs -> markdown image syntax with meaningful alt text
-                • External media -> {%% embed URL %%}
-                • Never render unsupported raw HTML embeds
-
-                ---
-
-                ## STEP 4 — SEO STRUCTURE (VERY IMPORTANT)
-
-                Include relevant sections (adapt based on topic):
-
+                Article structure:
                 ## Overview
                 ## Why This Is Trending
-                ## Important Dates
-                ## Vacancy Details
-                ## Eligibility Criteria
-                ## Salary / Pay Scale
-                ## Selection Process
-                ## Exam Pattern / Syllabus
-                ## Timeline of Events
-                ## Impact on Aspirants
-                ## What Should Aspirants Do Now
+                ## Key Updates
+                ## What This Means
+                ## What Readers Should Watch Next
                 ## FAQ
 
-                If not applicable, skip logically.
+                Formatting rules:
+                - Start body sections with ## headings only.
+                - Use short paragraphs and bullets where helpful.
+                - Use at most one card block, up to two details blocks, and one table only if they add value.
+                - Do not use CTA blocks.
+                - Use media only when genuinely relevant.
+                - Keep markdown valid for Forem.
 
-                ---
+                Tags and keywords rules:
+                - Decide the most appropriate tags and keywords yourself from the article content.
+                - Keep them relevant, concise, lowercase where appropriate, and properly formatted for Forem.
+                - Do not repeat or closely duplicate tags or keywords.
+                - Return up to 8 tags and up to 10 keywords.
 
-                ## STEP 5 — WRITING STYLE
-
-                • Short paragraphs (2–3 lines)
-                • Bullet points for clarity
-                • Bold key terms
-                • No long text blocks
-                • Do not use `#` headings in the article body; start sections with `##`
-                • Always return a rich-format article with cards, CTAs, details blocks, and a table of contents
-
-                ---
-
-                ## STEP 6 — ACCURACY
-
-                • Use only provided data
-                • If unclear:
-                  "As of now, no official confirmation is available."
-                • Do NOT invent facts
-
-                ---
-
-                ## STEP 7 — SEO RULES
-
-                • Identify primary search query
-                • Title must directly match it
-                • Include keywords naturally:
-                  - apply online
-                  - last date
-                  - eligibility
-                  - syllabus
-                  - salary
-
-                ---
-
-                ## STEP 8 — TITLE OPTIMIZATION
-
-                Title should:
-                • Include numbers / salary / dates
-                • Be clear and specific
-                • Target search intent
-
-                Example:
-                "SSC CGL 2026 Notification Out – Apply Online, Salary ₹44,900+"
-
-                ---
-
-                ## PROVIDED DATA
-
-                Cover Image: %s
-
-                News Sources:
+                Provided sources:
                 %s
 
-                Media:
+                Relevant media:
                 %s
 
-                ---
-
-                ## OUTPUT FORMAT (STRICT)
-
-                Return ONLY valid JSON:
-
+                Return ONLY valid JSON in this shape:
                 {
-                  "title": "SEO optimized headline",
-                  "markdown": "Full article in markdown with Forem liquid tags",
-                  "tags": ["max 8"],
-                  "keywords": ["max 10"]
+                  "title": "Clear article title",
+                  "markdown": "Full article in markdown",
+                  "tags": ["tag-one", "tag-two"],
+                  "keywords": ["keyword one", "keyword two"]
                 }
+                """, trend, language, sourcesText, mediaText);
+    }
 
-                No extra text outside JSON.
-                """, trend, language, coverImage, sourcesText, mediaText);
+    List<String> sanitizeTerms(JsonNode node, int maxTerms, boolean slugify) {
+        if (node == null || !node.isArray()) {
+            return List.of();
+        }
+        LinkedHashSet<String> values = new LinkedHashSet<>();
+        for (JsonNode item : node) {
+            String value = item.asText("");
+            if (value == null) {
+                continue;
+            }
+            String normalized = value.trim();
+            if (normalized.isBlank()) {
+                continue;
+            }
+            normalized = slugify ? toForemTag(normalized) : normalized.replaceAll("\\s+", " ");
+            if (normalized.isBlank()) {
+                continue;
+            }
+            String uniquenessKey = normalized.toLowerCase(Locale.ROOT);
+            if (values.stream().map(existing -> existing.toLowerCase(Locale.ROOT)).anyMatch(uniquenessKey::equals)) {
+                continue;
+            }
+            values.add(normalized);
+            if (values.size() >= maxTerms) {
+                break;
+            }
+        }
+        return new ArrayList<>(values);
+    }
+
+    private String toForemTag(String value) {
+        String normalized = value.toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9\\s-]", " ")
+                .replaceAll("\\s+", "-")
+                .replaceAll("-+", "-")
+                .replaceAll("^-|-$", "");
+        if (normalized.length() > 20) {
+            normalized = normalized.substring(0, 20).replaceAll("-+$", "");
+        }
+        return normalized;
     }
 
     private String buildSourcesText(List<TrendHeadline> headlines) {
@@ -261,40 +196,27 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
                 builder.append("  Content excerpt: ").append(safe(headline.articleDetails().content())).append("\n");
             }
         }
-        return builder.toString();
+        return builder.toString().isBlank() ? "- No source details were available." : builder.toString();
     }
 
     private String buildMediaText(List<TrendHeadline> headlines) {
-        StringBuilder builder = new StringBuilder();
-        for (HeadlineMediaResolver.ResolvedMedia media : headlineMediaResolver.resolveAdditionalMedia(headlines, 6)) {
-            builder.append("- ").append(safe(media.type()))
-                    .append(": ").append(safe(media.url())).append("\n");
-        }
-        return builder.isEmpty() ? "n/a" : builder.toString();
+        return headlineMediaResolver.resolveAdditionalMedia(headlines, 3).stream()
+                .map(media -> "- " + media.url())
+                .reduce("", (left, right) -> left + right + "\n");
     }
 
     private String safe(String value) {
-        return value == null || value.isBlank() ? "n/a" : value;
+        return Objects.toString(value, "").replaceAll("\\s+", " ").trim();
     }
 
     String extractJsonPayload(String content) {
-        if (content == null) {
-            return "{}";
-        }
-        String trimmed = content.trim();
+        String trimmed = content == null ? "" : content.trim();
         if (trimmed.startsWith("```")) {
-            int firstLineBreak = trimmed.indexOf('\n');
-            if (firstLineBreak >= 0) {
-                trimmed = trimmed.substring(firstLineBreak + 1);
+            int firstNewline = trimmed.indexOf('\n');
+            int lastFence = trimmed.lastIndexOf("```");
+            if (firstNewline >= 0 && lastFence > firstNewline) {
+                return trimmed.substring(firstNewline + 1, lastFence).trim();
             }
-            if (trimmed.endsWith("```")) {
-                trimmed = trimmed.substring(0, trimmed.length() - 3).trim();
-            }
-        }
-        int firstBrace = trimmed.indexOf('{');
-        int lastBrace = trimmed.lastIndexOf('}');
-        if (firstBrace >= 0 && lastBrace > firstBrace) {
-            return trimmed.substring(firstBrace, lastBrace + 1);
         }
         return trimmed;
     }
