@@ -1,5 +1,6 @@
 package com.careerpolitics.scraper.api;
 
+import com.careerpolitics.scraper.infrastructure.observability.HoneybadgerNotifier;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
@@ -12,9 +13,16 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+    private final HoneybadgerNotifier honeybadgerNotifier;
+
+    public ApiExceptionHandler(HoneybadgerNotifier honeybadgerNotifier) {
+        this.honeybadgerNotifier = honeybadgerNotifier;
+    }
 
     @ExceptionHandler(EntityNotFoundException.class)
     ProblemDetail handleNotFound(EntityNotFoundException exception, HttpServletRequest request) {
@@ -36,6 +44,12 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     ProblemDetail handleUnexpected(Exception exception, HttpServletRequest request) {
+        honeybadgerNotifier.notify(exception, honeybadgerNotifier.buildRequestContext(
+                request.getRequestURI(),
+                request.getMethod(),
+                request.getRequestURL().toString(),
+                Map.of()
+        ));
         return build(HttpStatus.INTERNAL_SERVER_ERROR, exception.getMessage(), request.getRequestURI(), List.of());
     }
 

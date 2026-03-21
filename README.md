@@ -25,6 +25,47 @@ This repository now contains **only** the Article Trending workflow, with Seleni
 
 The original browser-driven implementation was CPU-heavy because it used large service classes and aggressive interaction logic. The current version keeps Selenium, but isolates it behind adapters, defaults to headless mode, bounds retries, reduces interaction steps, disables manual verification waits by default, and preserves scheduler overlap protection.
 
+## Honeybadger error + log forwarding
+
+The service can now forward uncaught API errors to Honeybadger notices and ship application logs to Honeybadger Events/Insights. Enable it with these environment variables:
+
+```
+HONEYBADGER_ENABLED=true
+HONEYBADGER_API_KEY=your_project_api_key
+HONEYBADGER_ENVIRONMENT=production
+HONEYBADGER_LOGGING_ENABLED=true
+HONEYBADGER_LOGGING_MIN_LEVEL=WARN
+```
+
+Notes:
+
+- HTTP 5xx exceptions handled by `ApiExceptionHandler` are reported as Honeybadger error notices.
+- Logback continues writing to stdout and, when enabled, duplicates log events to Honeybadger.
+- The app strips query strings from the main request URL before sending notice metadata so secrets are less likely to leak.
+
+## GitHub Docker deployment pipeline
+
+A GitHub Actions workflow is included at `.github/workflows/docker-deploy.yml`. On every push to `main` (or when manually triggered), it:
+
+1. Runs `./gradlew test`.
+2. Builds a Docker image from `Dockerfile`.
+3. Pushes `ghcr.io/<owner>/<repo>:latest` and a commit-SHA tag to GitHub Container Registry.
+4. Optionally SSHes into your Docker host and runs `docker compose pull && docker compose up -d`.
+5. Optionally reports the deployment to Honeybadger using the deployments API.
+
+Set these GitHub repository secrets to enable remote deployment:
+
+- `DEPLOY_HOST`
+- `DEPLOY_PORT` (optional, defaults to `22`)
+- `DEPLOY_USER`
+- `DEPLOY_SSH_KEY`
+- `DEPLOY_PATH`
+- `APP_ENV_FILE` (full `.env` file contents for the server)
+- `HONEYBADGER_API_KEY` (optional, also used for deploy notifications)
+- `HONEYBADGER_ENVIRONMENT` (optional, defaults to `production`)
+
+The deployment job is skipped automatically until the required SSH secrets are present.
+
 ## Local run
 
 ```bash
