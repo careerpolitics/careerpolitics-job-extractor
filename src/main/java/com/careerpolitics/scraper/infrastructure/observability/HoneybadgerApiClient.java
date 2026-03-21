@@ -58,7 +58,20 @@ public class HoneybadgerApiClient {
     }
 
     public void notifyError(Throwable exception, Map<String, Object> requestContext) {
-        sendJson("/v1/notices", "application/json", buildNoticePayload(exception, requestContext), "error notice");
+        notifyError(exception.getClass().getName(),
+                Optional.ofNullable(exception.getMessage()).orElse(exception.getClass().getSimpleName()),
+                buildBacktrace(exception),
+                requestContext);
+    }
+
+    public void notifyError(String errorClass,
+                            String message,
+                            List<Map<String, Object>> backtrace,
+                            Map<String, Object> requestContext) {
+        sendJson("/v1/notices",
+                "application/json",
+                buildNoticePayload(errorClass, message, backtrace, requestContext),
+                "error notice");
     }
 
     public void sendLogEvent(Map<String, Object> event) {
@@ -89,13 +102,28 @@ public class HoneybadgerApiClient {
         return event;
     }
 
-    private Map<String, Object> buildNoticePayload(Throwable exception, Map<String, Object> requestContext) {
+    static List<Map<String, Object>> buildBacktrace(StackTraceElement[] stackTrace) {
+        return Arrays.stream(stackTrace)
+                .map(frame -> {
+                    Map<String, Object> line = new LinkedHashMap<>();
+                    line.put("file", frame.getFileName() == null ? frame.getClassName() : frame.getFileName());
+                    line.put("number", frame.getLineNumber());
+                    line.put("method", frame.getClassName() + "." + frame.getMethodName());
+                    return line;
+                })
+                .toList();
+    }
+
+    private Map<String, Object> buildNoticePayload(String errorClass,
+                                                   String message,
+                                                   List<Map<String, Object>> backtrace,
+                                                   Map<String, Object> requestContext) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("notifier", Map.of("name", serviceName));
         payload.put("error", Map.of(
-                "class", exception.getClass().getName(),
-                "message", Optional.ofNullable(exception.getMessage()).orElse(exception.getClass().getSimpleName()),
-                "backtrace", buildBacktrace(exception)
+                "class", errorClass,
+                "message", message,
+                "backtrace", backtrace
         ));
         payload.put("server", Map.of(
                 "environment_name", environment,
@@ -108,15 +136,7 @@ public class HoneybadgerApiClient {
     }
 
     private static List<Map<String, Object>> buildBacktrace(Throwable throwable) {
-        return Arrays.stream(throwable.getStackTrace())
-                .map(frame -> {
-                    Map<String, Object> line = new LinkedHashMap<>();
-                    line.put("file", frame.getFileName() == null ? frame.getClassName() : frame.getFileName());
-                    line.put("number", frame.getLineNumber());
-                    line.put("method", frame.getClassName() + "." + frame.getMethodName());
-                    return line;
-                })
-                .toList();
+        return buildBacktrace(throwable.getStackTrace());
     }
 
     private void sendJson(String path, String contentType, Object payload, String payloadType) {

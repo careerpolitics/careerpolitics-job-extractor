@@ -19,10 +19,6 @@ spring:
   jackson:
     default-property-inclusion: non_null
 
-honeybadger:
-  api-key: ${HONEYBADGER_API_KEY:}
-  environment: ${HONEYBADGER_ENVIRONMENT:${SPRING_PROFILES_ACTIVE:production}}
-  logging-enabled: ${HONEYBADGER_LOGGING_ENABLED:true}
 
 careerpolitics:
   trending:

@@ -14,15 +14,14 @@ import java.util.Map;
 
 public class HoneybadgerLogAppender extends AppenderBase<ILoggingEvent> {
 
-    private boolean enabled;
     private String apiKey;
-    private String environment = "production";
+    private String environment = "default";
     private String serviceName = "careerpolitics-trending-service";
     private HoneybadgerApiClient apiClient;
 
     @Override
     public void start() {
-        if (enabled && apiKey != null && !apiKey.isBlank()) {
+        if (apiKey != null && !apiKey.isBlank()) {
             this.apiClient = new HoneybadgerApiClient(apiKey, environment, serviceName);
         }
         super.start();
@@ -34,6 +33,7 @@ public class HoneybadgerLogAppender extends AppenderBase<ILoggingEvent> {
             return;
         }
 
+        ThrowableProxyDetails throwableDetails = extractThrowableDetails(eventObject);
         Map<String, Object> event = HoneybadgerApiClient.buildLogEvent(
                 serviceName,
                 environment,
@@ -45,14 +45,30 @@ public class HoneybadgerLogAppender extends AppenderBase<ILoggingEvent> {
                 Instant.ofEpochMilli(eventObject.getTimeStamp())
         );
 
-        if (eventObject.getThrowableProxy() != null) {
-            IThrowableProxy proxy = eventObject.getThrowableProxy();
-            event.put("error_class", proxy.getClassName());
-            event.put("error_message", proxy.getMessage());
-            event.put("backtrace", buildBacktrace(proxy));
+        if (throwableDetails != null) {
+            event.put("error_class", throwableDetails.errorClass());
+            event.put("error_message", throwableDetails.message());
+            event.put("backtrace", throwableDetails.backtrace());
         }
 
         apiClient.sendLogEvent(event);
+
+        if (eventObject.getLevel().toInt() >= Level.ERROR_INT) {
+            apiClient.notifyError(
+                    throwableDetails == null ? eventObject.getLoggerName() : throwableDetails.errorClass(),
+                    throwableDetails == null ? eventObject.getFormattedMessage() : throwableDetails.message(),
+                    throwableDetails == null ? HoneybadgerApiClient.buildBacktrace(eventObject.getCallerData()) : throwableDetails.backtrace(),
+                    Map.of("component", eventObject.getLoggerName())
+            );
+        }
+    }
+
+    private ThrowableProxyDetails extractThrowableDetails(ILoggingEvent eventObject) {
+        if (eventObject.getThrowableProxy() == null) {
+            return null;
+        }
+        IThrowableProxy proxy = eventObject.getThrowableProxy();
+        return new ThrowableProxyDetails(proxy.getClassName(), proxy.getMessage(), buildBacktrace(proxy));
     }
 
     private List<Map<String, Object>> buildBacktrace(IThrowableProxy proxy) {
@@ -68,10 +84,6 @@ public class HoneybadgerLogAppender extends AppenderBase<ILoggingEvent> {
                 .toList();
     }
 
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
-    }
-
     public void setApiKey(String apiKey) {
         this.apiKey = apiKey;
     }
@@ -82,5 +94,8 @@ public class HoneybadgerLogAppender extends AppenderBase<ILoggingEvent> {
 
     public void setServiceName(String serviceName) {
         this.serviceName = serviceName;
+    }
+
+    private record ThrowableProxyDetails(String errorClass, String message, List<Map<String, Object>> backtrace) {
     }
 }

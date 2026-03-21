@@ -25,18 +25,18 @@ This repository now contains **only** the Article Trending workflow, with Seleni
 
 The app supports a small Honeybadger setup for production errors and logs.
 
-Set these environment variables if you want Honeybadger enabled:
+Set this environment variable if you want Honeybadger enabled:
 
 ```
 HONEYBADGER_API_KEY=your_project_api_key
-HONEYBADGER_ENVIRONMENT=production
-HONEYBADGER_LOGGING_ENABLED=true
 ```
 
 Behavior:
 
 - Unhandled API exceptions are sent to Honeybadger as error notices.
-- Application logs at `WARN` and above are forwarded to Honeybadger Events.
+- `WARN` logs are forwarded as Honeybadger log events.
+- `ERROR` logs are forwarded as log events and also reported as Honeybadger errors, so operational failures show up in the main Honeybadger error feed.
+- The Honeybadger environment is derived from the active Spring profile.
 - Console logging still stays enabled.
 
 ## GitHub Docker deployment pipeline

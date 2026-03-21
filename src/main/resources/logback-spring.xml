@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-    <springProperty scope="context" name="hbApiKey" source="honeybadger.api-key" defaultValue=""/>
-    <springProperty scope="context" name="hbEnvironment" source="honeybadger.environment" defaultValue="production"/>
-    <springProperty scope="context" name="hbLoggingEnabled" source="honeybadger.logging-enabled" defaultValue="true"/>
+    <springProperty scope="context" name="hbApiKey" source="HONEYBADGER_API_KEY" defaultValue=""/>
+    <springProperty scope="context" name="hbEnvironment" source="spring.profiles.active" defaultValue="default"/>
     <springProperty scope="context" name="hbServiceName" source="spring.application.name" defaultValue="careerpolitics-trending-service"/>
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
@@ -12,7 +11,6 @@
     </appender>
 
     <appender name="HONEYBADGER" class="com.careerpolitics.scraper.infrastructure.observability.HoneybadgerLogAppender">
-        <enabled>${hbLoggingEnabled}</enabled>
         <apiKey>${hbApiKey}</apiKey>
         <environment>${hbEnvironment}</environment>
         <serviceName>${hbServiceName}</serviceName>

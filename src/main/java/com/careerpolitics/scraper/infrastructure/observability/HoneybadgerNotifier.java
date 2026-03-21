@@ -13,8 +13,8 @@ public class HoneybadgerNotifier {
     private final String apiKey;
     private final HoneybadgerApiClient apiClient;
 
-    public HoneybadgerNotifier(@Value("${honeybadger.api-key:}") String apiKey,
-                               @Value("${honeybadger.environment:${SPRING_PROFILES_ACTIVE:production}}") String environment,
+    public HoneybadgerNotifier(@Value("${HONEYBADGER_API_KEY:}") String apiKey,
+                               @Value("${spring.profiles.active:default}") String environment,
                                @Value("${spring.application.name}") String serviceName) {
         this.apiKey = apiKey;
         this.apiClient = new HoneybadgerApiClient(apiKey, environment, serviceName);
