@@ -58,8 +58,9 @@ class OpenRouterArticleGeneratorTest {
         );
 
         var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-        var tags = mapper.readTree("[\"AI Jobs\",\"AI Jobs\",\"Policy Update\",\"Govt Exams\",\"Results\",\"Extra\"]");
-        assertThat(generator.sanitizeTerms(tags, 4)).containsExactly("AI Jobs", "Policy Update", "Govt Exams", "Results");
+        var tags = mapper.readTree("[\"AI Jobs\",\"AI-Jobs\",\"Policy Update!\",\"Govt Exams\",\"Results\",\"Extra\"]");
+
+        assertThat(generator.sanitizeTerms(tags, 4)).containsExactly("aijobs", "policyupdate", "govtexams", "results");
     }
 
     private TrendingProperties properties() {

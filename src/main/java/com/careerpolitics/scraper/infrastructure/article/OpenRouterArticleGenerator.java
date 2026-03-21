@@ -143,6 +143,13 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
                 • Keep markdown clean, readable, and publication-ready
                 • Do not use CTA blocks
 
+                Rich formatting and media instructions:
+                • Use media only when it genuinely improves the article
+                • If you use an image, use standard markdown image syntax with clear alt text
+                • If you use an external media URL that suits embedding, use Forem embed syntax: {% embed URL %}
+                • Never output raw HTML embeds
+                • Prefer a clean article first; use rich elements only where they add clarity
+
                 ---
 
                 STEP 5 — ACCURACY (VERY IMPORTANT)
@@ -218,15 +225,8 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
         }
         LinkedHashSet<String> values = new LinkedHashSet<>();
         for (JsonNode item : node) {
-            String normalized = item.asText("").replaceAll("\\s+", " ").trim();
+            String normalized = sanitizeTag(item.asText(""));
             if (normalized.isBlank()) {
-                continue;
-            }
-            String uniquenessKey = normalized.toLowerCase(Locale.ROOT);
-            boolean duplicate = values.stream()
-                    .map(existing -> existing.toLowerCase(Locale.ROOT))
-                    .anyMatch(uniquenessKey::equals);
-            if (duplicate) {
                 continue;
             }
             values.add(normalized);
@@ -235,6 +235,10 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
             }
         }
         return new ArrayList<>(values);
+    }
+
+    private String sanitizeTag(String value) {
+        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
     }
 
     private String requiredText(JsonNode article, String fieldName) {
