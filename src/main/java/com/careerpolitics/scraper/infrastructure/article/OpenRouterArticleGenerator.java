@@ -146,7 +146,7 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
                 Rich formatting and media instructions:
                 • Use media only when it genuinely improves the article
                 • If you use an image, use standard markdown image syntax with clear alt text
-                • If you use an external media URL that suits embedding, use Forem embed syntax: {% embed URL %}
+                • If you use an external media URL that suits embedding, use Forem embed syntax: {%% embed URL %%}
                 • Never output raw HTML embeds
                 • Prefer a clean article first; use rich elements only where they add clarity
 
@@ -265,7 +265,7 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
     }
 
     private String buildMediaText(List<TrendHeadline> headlines) {
-        String media = headlineMediaResolver.resolveAdditionalMedia(headlines, 3).stream()
+        String media = headlineMediaResolver.resolveAdditionalMedia(headlines, 5).stream()
                 .map(mediaItem -> "- " + mediaItem.url())
                 .reduce("", (left, right) -> left + right + "\n");
         return media.isBlank() ? "- No additional media supplied." : media;
