@@ -27,18 +27,6 @@ services:
       - key: OPENROUTER_API_KEY
         scope: RUN_TIME
         type: SECRET
-      - key: HONEYBADGER_API_KEY
-        scope: RUN_TIME
-        type: SECRET
-      - key: HONEYBADGER_ENABLED
-        scope: RUN_TIME
-        value: "true"
-      - key: HONEYBADGER_ENVIRONMENT
-        scope: RUN_TIME
-        value: "production"
-      - key: HONEYBADGER_LOGGING_ENABLED
-        scope: RUN_TIME
-        value: "true"
       - key: CAREERPOLITICS_ARTICLE_API_URL
         scope: RUN_TIME
         type: SECRET

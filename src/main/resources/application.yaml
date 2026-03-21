@@ -19,18 +19,12 @@ spring:
   jackson:
     default-property-inclusion: non_null
 
+honeybadger:
+  api-key: ${HONEYBADGER_API_KEY:}
+  environment: ${HONEYBADGER_ENVIRONMENT:${SPRING_PROFILES_ACTIVE:production}}
+  logging-enabled: ${HONEYBADGER_LOGGING_ENABLED:true}
+
 careerpolitics:
-  observability:
-    honeybadger:
-      enabled: ${HONEYBADGER_ENABLED:false}
-      api-key: ${HONEYBADGER_API_KEY:}
-      endpoint: ${HONEYBADGER_ENDPOINT:https://api.honeybadger.io}
-      environment: ${HONEYBADGER_ENVIRONMENT:${SPRING_PROFILES_ACTIVE:production}}
-      service-name: ${HONEYBADGER_SERVICE_NAME:${spring.application.name}}
-      timeout: ${HONEYBADGER_TIMEOUT:3s}
-      logging:
-        enabled: ${HONEYBADGER_LOGGING_ENABLED:true}
-        minimum-level: ${HONEYBADGER_LOGGING_MIN_LEVEL:WARN}
   trending:
     discovery:
       google-trends-url: ${GOOGLE_TRENDS_URL:https://trends.google.com/trending}
@@ -111,7 +105,3 @@ logging:
 server:
   port: ${PORT:8080}
   shutdown: graceful
-
-info:
-  app:
-    version: ${APP_VERSION:1.0-SNAPSHOT}

@@ -1,13 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-    <springProperty scope="context" name="hbEnabled" source="careerpolitics.observability.honeybadger.enabled" defaultValue="false"/>
-    <springProperty scope="context" name="hbApiKey" source="careerpolitics.observability.honeybadger.api-key" defaultValue=""/>
-    <springProperty scope="context" name="hbEndpoint" source="careerpolitics.observability.honeybadger.endpoint" defaultValue="https://api.honeybadger.io"/>
-    <springProperty scope="context" name="hbEnvironment" source="careerpolitics.observability.honeybadger.environment" defaultValue="production"/>
-    <springProperty scope="context" name="hbServiceName" source="careerpolitics.observability.honeybadger.service-name" defaultValue="careerpolitics-trending-service"/>
-    <springProperty scope="context" name="hbLoggingEnabled" source="careerpolitics.observability.honeybadger.logging.enabled" defaultValue="false"/>
-    <springProperty scope="context" name="hbMinimumLevel" source="careerpolitics.observability.honeybadger.logging.minimum-level" defaultValue="WARN"/>
-    <springProperty scope="context" name="hbVersion" source="info.app.version" defaultValue="unknown"/>
+    <springProperty scope="context" name="hbApiKey" source="honeybadger.api-key" defaultValue=""/>
+    <springProperty scope="context" name="hbEnvironment" source="honeybadger.environment" defaultValue="production"/>
+    <springProperty scope="context" name="hbLoggingEnabled" source="honeybadger.logging-enabled" defaultValue="true"/>
+    <springProperty scope="context" name="hbServiceName" source="spring.application.name" defaultValue="careerpolitics-trending-service"/>
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
@@ -16,14 +12,10 @@
     </appender>
 
     <appender name="HONEYBADGER" class="com.careerpolitics.scraper.infrastructure.observability.HoneybadgerLogAppender">
-        <enabled>${hbEnabled}</enabled>
-        <loggingEnabled>${hbLoggingEnabled}</loggingEnabled>
+        <enabled>${hbLoggingEnabled}</enabled>
         <apiKey>${hbApiKey}</apiKey>
-        <endpoint>${hbEndpoint}</endpoint>
         <environment>${hbEnvironment}</environment>
         <serviceName>${hbServiceName}</serviceName>
-        <minimumLevel>${hbMinimumLevel}</minimumLevel>
-        <version>${hbVersion}</version>
     </appender>
 
     <root level="INFO">

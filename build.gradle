@@ -8,9 +8,6 @@ plugins {
 group = 'com.careerpolitics.scraper'
 version = '1.0-SNAPSHOT'
 
-ext {
-    appVersion = version
-}
 
 java {
     toolchain {

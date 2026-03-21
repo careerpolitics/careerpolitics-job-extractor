@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.net.URI;
 import java.util.List;
-import java.util.Map;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -44,12 +43,7 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     ProblemDetail handleUnexpected(Exception exception, HttpServletRequest request) {
-        honeybadgerNotifier.notify(exception, honeybadgerNotifier.buildRequestContext(
-                request.getRequestURI(),
-                request.getMethod(),
-                request.getRequestURL().toString(),
-                Map.of()
-        ));
+        honeybadgerNotifier.notify(exception, request);
         return build(HttpStatus.INTERNAL_SERVER_ERROR, exception.getMessage(), request.getRequestURI(), List.of());
     }
 

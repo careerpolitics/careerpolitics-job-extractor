@@ -35,11 +35,10 @@ class HoneybadgerApiClientTest {
 
         HoneybadgerApiClient client = new HoneybadgerApiClient(
                 HttpClient.newHttpClient(),
-                "api-key",
                 "http://localhost:" + server.getAddress().getPort(),
+                "api-key",
                 "production",
-                "careerpolitics-trending-service",
-                "1.0.0"
+                "careerpolitics-trending-service"
         );
 
         client.notifyError(new IllegalStateException("boom"), Map.of("url", "http://localhost/api/trending/articles?token=secret"));
@@ -58,11 +57,10 @@ class HoneybadgerApiClientTest {
 
         HoneybadgerApiClient client = new HoneybadgerApiClient(
                 HttpClient.newHttpClient(),
-                "api-key",
                 "http://localhost:" + server.getAddress().getPort(),
+                "api-key",
                 "production",
-                "careerpolitics-trending-service",
-                "1.0.0"
+                "careerpolitics-trending-service"
         );
 
         client.sendLogEvent(HoneybadgerApiClient.buildLogEvent(

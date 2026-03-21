@@ -1,6 +1,5 @@
 package com.careerpolitics.scraper.infrastructure.observability;
 
-import com.careerpolitics.scraper.config.HoneybadgerProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -25,65 +24,45 @@ import java.util.Optional;
 @Slf4j
 public class HoneybadgerApiClient {
 
+    private static final String API_BASE_URL = "https://api.honeybadger.io";
     private static final DateTimeFormatter RFC_3339 = DateTimeFormatter.ISO_OFFSET_DATE_TIME.withZone(ZoneOffset.UTC);
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final HttpClient httpClient;
+    private final String baseUrl;
     private final String apiKey;
-    private final String endpoint;
     private final String environment;
     private final String serviceName;
-    private final String notifierVersion;
 
-    public HoneybadgerApiClient(HoneybadgerProperties properties, String notifierVersion) {
-        this(HttpClient.newHttpClient(), properties.apiKey(), properties.endpoint(), properties.environment(),
-                properties.serviceName(), notifierVersion);
+    public HoneybadgerApiClient(String apiKey, String environment, String serviceName) {
+        this(HttpClient.newHttpClient(), API_BASE_URL, apiKey, environment, serviceName);
     }
 
     public HoneybadgerApiClient(HttpClient httpClient,
                                 String apiKey,
-                                String endpoint,
                                 String environment,
-                                String serviceName,
-                                String notifierVersion) {
+                                String serviceName) {
+        this(httpClient, API_BASE_URL, apiKey, environment, serviceName);
+    }
+
+    HoneybadgerApiClient(HttpClient httpClient,
+                         String baseUrl,
+                         String apiKey,
+                         String environment,
+                         String serviceName) {
         this.httpClient = httpClient;
+        this.baseUrl = baseUrl;
         this.apiKey = apiKey;
-        this.endpoint = trimTrailingSlash(endpoint);
         this.environment = environment;
         this.serviceName = serviceName;
-        this.notifierVersion = notifierVersion;
     }
 
     public void notifyError(Throwable exception, Map<String, Object> requestContext) {
-        try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(endpoint + "/v1/notices"))
-                    .header("X-API-Key", apiKey)
-                    .header("Content-Type", "application/json")
-                    .header("Accept", "application/json")
-                    .header("User-Agent", buildUserAgent())
-                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(buildNoticePayload(exception, requestContext)), StandardCharsets.UTF_8))
-                    .build();
-            send(request, "error notice");
-        } catch (JsonProcessingException jsonProcessingException) {
-            log.warn("Unable to serialize Honeybadger notice payload: {}", jsonProcessingException.getMessage());
-        }
+        sendJson("/v1/notices", "application/json", buildNoticePayload(exception, requestContext), "error notice");
     }
 
     public void sendLogEvent(Map<String, Object> event) {
-        try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(endpoint + "/v1/events"))
-                    .header("X-API-Key", apiKey)
-                    .header("Accept", "application/json")
-                    .header("Content-Type", "application/x-ndjson")
-                    .header("User-Agent", buildUserAgent())
-                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(event) + "\n", StandardCharsets.UTF_8))
-                    .build();
-            send(request, "log event");
-        } catch (JsonProcessingException jsonProcessingException) {
-            log.warn("Unable to serialize Honeybadger log event: {}", jsonProcessingException.getMessage());
-        }
+        sendJson("/v1/events", "application/x-ndjson", event, "log event", true);
     }
 
     public static Map<String, Object> buildLogEvent(String serviceName,
@@ -112,11 +91,7 @@ public class HoneybadgerApiClient {
 
     private Map<String, Object> buildNoticePayload(Throwable exception, Map<String, Object> requestContext) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("notifier", Map.of(
-                "name", serviceName,
-                "url", "https://github.com/careerpolitics/careerpolitics-job-extractor",
-                "version", notifierVersion
-        ));
+        payload.put("notifier", Map.of("name", serviceName));
         payload.put("error", Map.of(
                 "class", exception.getClass().getName(),
                 "message", Optional.ofNullable(exception.getMessage()).orElse(exception.getClass().getSimpleName()),
@@ -124,8 +99,7 @@ public class HoneybadgerApiClient {
         ));
         payload.put("server", Map.of(
                 "environment_name", environment,
-                "hostname", resolveHostname(),
-                "project_root", System.getProperty("user.dir")
+                "hostname", resolveHostname()
         ));
         if (requestContext != null && !requestContext.isEmpty()) {
             payload.put("request", requestContext);
@@ -145,6 +119,30 @@ public class HoneybadgerApiClient {
                 .toList();
     }
 
+    private void sendJson(String path, String contentType, Object payload, String payloadType) {
+        sendJson(path, contentType, payload, payloadType, false);
+    }
+
+    private void sendJson(String path, String contentType, Object payload, String payloadType, boolean ndjson) {
+        try {
+            String serialized = objectMapper.writeValueAsString(payload);
+            if (ndjson) {
+                serialized = serialized + "\n";
+            }
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + path))
+                    .header("X-API-Key", apiKey)
+                    .header("Content-Type", contentType)
+                    .header("Accept", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(serialized, StandardCharsets.UTF_8))
+                    .build();
+            send(request, payloadType);
+        } catch (JsonProcessingException jsonProcessingException) {
+            log.warn("Unable to serialize Honeybadger {} payload: {}", payloadType, jsonProcessingException.getMessage());
+        }
+    }
+
     private void send(HttpRequest request, String payloadType) {
         try {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -157,17 +155,6 @@ public class HoneybadgerApiClient {
             }
             log.warn("Unable to send {} to Honeybadger: {}", payloadType, exception.getMessage());
         }
-    }
-
-    private String buildUserAgent() {
-        return "CareerPolitics-Honeybadger " + notifierVersion + "; Java " + Runtime.version() + "; " + System.getProperty("os.name");
-    }
-
-    private static String trimTrailingSlash(String value) {
-        if (value == null || value.isBlank()) {
-            return "https://api.honeybadger.io";
-        }
-        return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
     }
 
     private static String resolveHostname() {
