@@ -9,6 +9,7 @@ import java.util.List;
 public interface ArticlePublisher {
     PublishingResult publish(String title,
                              String markdown,
+                             String description,
                              List<String> tags,
                              String trend,
                              List<TrendHeadline> headlines,

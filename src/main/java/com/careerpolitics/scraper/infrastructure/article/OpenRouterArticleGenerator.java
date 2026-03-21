@@ -22,7 +22,6 @@ import java.util.Objects;
 public class OpenRouterArticleGenerator implements ArticleGenerator {
 
     private static final int MAX_TAGS = 4;
-    private static final int MAX_KEYWORDS = 10;
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
@@ -48,7 +47,7 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
                 .body(Map.of(
                         "model", properties.generation().openRouterModel(),
                         "messages", List.of(
-                                Map.of("role", "system", "content", "Return only valid JSON with title, markdown, tags, and keywords fields."),
+                                Map.of("role", "system", "content", "Return only valid JSON with title, markdown, description, and tags fields."),
                                 Map.of("role", "user", "content", buildPrompt(trend, language, headlines))
                         )
                 ))
@@ -60,15 +59,12 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
             JsonNode article = objectMapper.readTree(extractJsonPayload(content));
             String title = requiredText(article, "title");
             String markdown = requiredText(article, "markdown");
+            String description = requiredText(article, "description");
             List<String> tags = sanitizeTerms(article.path("tags"), MAX_TAGS);
-            List<String> keywords = sanitizeTerms(article.path("keywords"), MAX_KEYWORDS);
             if (tags.isEmpty()) {
                 throw new IllegalStateException("AI response did not include usable tags.");
             }
-            if (keywords.isEmpty()) {
-                throw new IllegalStateException("AI response did not include usable keywords.");
-            }
-            return new GeneratedArticleDraft(title, markdown, tags, keywords, "open-router");
+            return new GeneratedArticleDraft(title, markdown, tags, description, "open-router");
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Failed to parse AI article response.", exception);
         }
@@ -90,7 +86,7 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
                 - Use only the supplied source material.
                 - Do not mention AI, prompts, generation steps, or code.
                 - Do not include promotional lines, subscription prompts, Telegram mentions, or marketing copy.
-                - Do not include any extra fields beyond title, markdown, tags, and keywords.
+                - Do not include any extra fields beyond title, markdown, description, and tags.
                 - If a fact is unclear or unconfirmed, say: "As of now, no official confirmation is available."
                 - Do not invent facts.
 
@@ -112,13 +108,15 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
                 - Use media only when genuinely useful to the article.
                 - Keep the markdown readable and publication-ready.
 
-                Tags and keywords rules:
+                Description rules:
+                - Return one concise plain-text description for the article.
+                - Keep it informative, specific, and suitable for API publishing metadata.
+                - Do not repeat the full title word-for-word unless necessary.
+
+                Tag rules:
                 - You must choose them yourself based on the article you write.
                 - Return exactly 1 to 4 tags.
                 - Tags must be concise, relevant, Forem-friendly, and non-duplicative.
-                - Return 1 to 10 keywords.
-                - Keywords must be relevant, concise, and non-duplicative.
-                - Do not repeat the same wording across tags and keywords unless it is clearly necessary.
 
                 Source material:
                 %s
@@ -130,8 +128,8 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
                 {
                   "title": "Clear article title",
                   "markdown": "Full article in markdown",
-                  "tags": ["tag-one", "tag-two"],
-                  "keywords": ["keyword one", "keyword two"]
+                  "description": "Plain-text article description",
+                  "tags": ["tag-one", "tag-two"]
                 }
                 """, trend, language, sourcesText, mediaText);
     }

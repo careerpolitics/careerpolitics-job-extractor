@@ -7,7 +7,7 @@ public record GeneratedArticle(
         String title,
         String markdown,
         List<String> tags,
-        List<String> keywords,
+        String description,
         List<TrendHeadline> sources,
         boolean published,
         PublishingResult publishingResult,

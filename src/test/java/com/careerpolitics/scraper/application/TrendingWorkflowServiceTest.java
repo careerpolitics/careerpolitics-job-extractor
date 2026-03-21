@@ -52,9 +52,9 @@ class TrendingWorkflowServiceTest {
         when(trendNewsClient.discover(anyString(), anyString(), anyString(), anyInt())).thenReturn(headlines);
         when(trendHeadlineDetailClient.enrich(headlines)).thenReturn(headlines);
         when(articleGenerator.generate(anyString(), anyString(), anyList())).thenReturn(
-                new GeneratedArticleDraft("Title", "Markdown", List.of("tag1"), List.of("keyword"), "template")
+                new GeneratedArticleDraft("Title", "Markdown", List.of("tag1"), "Description", "open-router")
         );
-        when(articlePublisher.publish(anyString(), anyString(), anyList(), anyString(), anyList(), any())).thenReturn(
+        when(articlePublisher.publish(anyString(), anyString(), anyString(), anyList(), anyString(), anyList(), any())).thenReturn(
                 new PublishingResult(true, "Published successfully.", null)
         );
 
@@ -87,9 +87,9 @@ class TrendingWorkflowServiceTest {
         when(trendNewsClient.discover(anyString(), anyString(), anyString(), anyInt())).thenReturn(List.of());
         when(trendHeadlineDetailClient.enrich(List.of())).thenReturn(List.of());
         when(articleGenerator.generate(anyString(), anyString(), anyList())).thenReturn(
-                new GeneratedArticleDraft("Title", "Markdown", List.of("tag1"), List.of("keyword"), "template")
+                new GeneratedArticleDraft("Title", "Markdown", List.of("tag1"), "Description", "open-router")
         );
-        when(articlePublisher.publish(anyString(), anyString(), anyList(), anyString(), anyList(), any())).thenReturn(
+        when(articlePublisher.publish(anyString(), anyString(), anyString(), anyList(), anyString(), anyList(), any())).thenReturn(
                 new PublishingResult(false, "Publish failed.", null)
         );
 
@@ -126,9 +126,9 @@ class TrendingWorkflowServiceTest {
         when(trendNewsClient.discover(anyString(), anyString(), anyString(), anyInt())).thenReturn(headlines);
         when(trendHeadlineDetailClient.enrich(headlines)).thenReturn(headlines);
         when(articleGenerator.generate(anyString(), anyString(), anyList())).thenReturn(
-                new GeneratedArticleDraft("Title", "Markdown", List.of("tag1"), List.of("keyword"), "template")
+                new GeneratedArticleDraft("Title", "Markdown", List.of("tag1"), "Description", "open-router")
         );
-        when(articlePublisher.publish(anyString(), anyString(), anyList(), anyString(), anyList(), any())).thenReturn(
+        when(articlePublisher.publish(anyString(), anyString(), anyString(), anyList(), anyString(), anyList(), any())).thenReturn(
                 new PublishingResult(true, "Stored as draft.", null)
         );
 
@@ -136,7 +136,7 @@ class TrendingWorkflowServiceTest {
         request.setPublish(false);
         service.generate(request);
 
-        verify(articlePublisher).publish(anyString(), anyString(), anyList(), anyString(), anyList(), any());
+        verify(articlePublisher).publish(anyString(), anyString(), anyString(), anyList(), anyString(), anyList(), any());
         verify(trendSelectionService, never()).remember(anyString(), anyBoolean());
     }
 }

@@ -98,6 +98,7 @@ public class TrendingWorkflowService {
             PublishingResult publishingResult = articlePublisher.publish(
                     draft.title(),
                     draft.markdown(),
+                    draft.description(),
                     draft.tags(),
                     trend,
                     enrichedHeadlines,
@@ -122,7 +123,7 @@ public class TrendingWorkflowService {
                     draft.title(),
                     draft.markdown(),
                     draft.tags(),
-                    draft.keywords(),
+                    draft.description(),
                     enrichedHeadlines,
                     published,
                     publishingResult,

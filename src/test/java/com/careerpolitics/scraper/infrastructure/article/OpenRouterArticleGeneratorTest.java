@@ -59,10 +59,7 @@ class OpenRouterArticleGeneratorTest {
 
         var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
         var tags = mapper.readTree("[\"AI Jobs\",\"AI Jobs\",\"Policy Update\",\"Govt Exams\",\"Results\",\"Extra\"]");
-        var keywords = mapper.readTree("[\"AI Jobs\",\"AI Jobs\",\"Policy update\"]");
-
         assertThat(generator.sanitizeTerms(tags, 4)).containsExactly("AI Jobs", "Policy Update", "Govt Exams", "Results");
-        assertThat(generator.sanitizeTerms(keywords, 10)).containsExactly("AI Jobs", "Policy update");
     }
 
     private TrendingProperties properties() {

@@ -46,6 +46,7 @@ class CareerPoliticsArticlePublisherTest {
             PublishingResult result = publisher.publish(
                     "Example title",
                     "Example markdown",
+                    "Example article description",
                     List.of("Tag One", "Tag@One", "tag2"),
                     "example-trend",
                     List.of(new TrendHeadline(
@@ -71,7 +72,9 @@ class CareerPoliticsArticlePublisherTest {
                     .containsEntry("body_markdown", "Example markdown")
                     .containsEntry("published", true)
                     .containsEntry("main_image", "https://example.com/story.jpg")
-                    .containsEntry("description", "Example summary")
+                    .containsEntry("series", "")
+                    .containsEntry("canonical_url", "")
+                    .containsEntry("description", "Example article description")
                     .containsEntry("tags", "tagone,tag2")
                     .containsEntry("organization_id", 42);
         } finally {
@@ -101,6 +104,7 @@ class CareerPoliticsArticlePublisherTest {
             PublishingResult result = publisher.publish(
                     "Example title",
                     "Example markdown",
+                    "Example article description",
                     List.of("tag1"),
                     "example-trend",
                     List.of(),
