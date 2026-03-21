@@ -37,6 +37,7 @@ public class CareerPoliticsArticlePublisher implements ArticlePublisher {
     @Override
     public PublishingResult publish(String title,
                                     String markdown,
+                                    String description,
                                     List<String> tags,
                                     String trend,
                                     List<TrendHeadline> headlines,
@@ -58,8 +59,10 @@ public class CareerPoliticsArticlePublisher implements ArticlePublisher {
         articlePayload.put("title", title);
         articlePayload.put("body_markdown", markdown);
         articlePayload.put("published", request.shouldPublish());
+        articlePayload.put("series", "");
         articlePayload.put("main_image", resolveMainImage(headlines));
-        articlePayload.put("description", buildDescription(title, trend, headlines));
+        articlePayload.put("canonical_url", "");
+        articlePayload.put("description", description == null ? "" : description);
         articlePayload.put("tags", toTagString(tags));
         articlePayload.put("organization_id", organizationId == null ? 0L : organizationId);
 
@@ -109,22 +112,6 @@ public class CareerPoliticsArticlePublisher implements ArticlePublisher {
         }
         String singleLine = responseBody.replaceAll("\\s+", " ").trim();
         return singleLine.length() > 500 ? singleLine.substring(0, 500) + "..." : singleLine;
-    }
-
-    private String buildDescription(String title, String trend, List<TrendHeadline> headlines) {
-        if (headlines != null) {
-            for (TrendHeadline headline : headlines) {
-                if (headline.articleDetails() != null
-                        && headline.articleDetails().description() != null
-                        && !headline.articleDetails().description().isBlank()) {
-                    return headline.articleDetails().description();
-                }
-            }
-        }
-        if (title != null && !title.isBlank()) {
-            return title;
-        }
-        return trend == null || trend.isBlank() ? "Trending article" : "Trending article about " + trend;
     }
 
     private String toTagString(List<String> tags) {

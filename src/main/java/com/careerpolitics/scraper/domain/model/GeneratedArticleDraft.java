@@ -6,7 +6,7 @@ public record GeneratedArticleDraft(
         String title,
         String markdown,
         List<String> tags,
-        List<String> keywords,
+        String description,
         String strategy
 ) {
 }

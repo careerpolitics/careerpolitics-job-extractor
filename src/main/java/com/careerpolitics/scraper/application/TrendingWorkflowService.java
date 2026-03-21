@@ -86,8 +86,8 @@ public class TrendingWorkflowService {
 
             List<String> articleWarnings = new ArrayList<>();
             if (enrichedHeadlines.isEmpty()) {
-                articleWarnings.add("No headlines found for trend '" + trend + "'. Generated article uses a template fallback.");
-                log.warn("No headlines found for trend='{}'. Falling back to template-driven article generation.", trend);
+                articleWarnings.add("No headlines found for trend '" + trend + "'. AI article generation will rely on limited source input.");
+                log.warn("No headlines found for trend='{}'. AI article generation will run with limited source input.", trend);
             }
 
             GeneratedArticleDraft draft = articleGenerator.generate(trend, request.getLanguage(), enrichedHeadlines);
@@ -98,6 +98,7 @@ public class TrendingWorkflowService {
             PublishingResult publishingResult = articlePublisher.publish(
                     draft.title(),
                     draft.markdown(),
+                    draft.description(),
                     draft.tags(),
                     trend,
                     enrichedHeadlines,
@@ -122,7 +123,7 @@ public class TrendingWorkflowService {
                     draft.title(),
                     draft.markdown(),
                     draft.tags(),
-                    draft.keywords(),
+                    draft.description(),
                     enrichedHeadlines,
                     published,
                     publishingResult,
@@ -132,8 +133,8 @@ public class TrendingWorkflowService {
         }
 
         if (allHeadlines.isEmpty()) {
-            warnings.add("No headlines were returned from the Selenium Google News workflow. Articles were generated using trend-only fallback content.");
-            log.warn("Workflow completed without any Selenium news headlines. Generated articles use trend-only fallback content.");
+            warnings.add("No headlines were returned from the Selenium Google News workflow. AI article generation ran without source headlines.");
+            log.warn("Workflow completed without any Selenium news headlines. AI article generation ran without source headlines.");
         }
 
         TrendingArticleResponse response = new TrendingArticleResponse(selectedTrends, deduplicateHeadlines(allHeadlines), articles, warnings);

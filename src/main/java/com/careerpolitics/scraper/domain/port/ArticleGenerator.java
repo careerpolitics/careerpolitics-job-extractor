@@ -6,7 +6,5 @@ import com.careerpolitics.scraper.domain.model.TrendHeadline;
 import java.util.List;
 
 public interface ArticleGenerator {
-    boolean supportsAi();
-
     GeneratedArticleDraft generate(String trend, String language, List<TrendHeadline> headlines);
 }
