@@ -2,7 +2,6 @@ package com.careerpolitics.scraper.infrastructure.selenium;
 
 import com.careerpolitics.scraper.config.TrendingProperties;
 import org.junit.jupiter.api.Test;
-import org.openqa.selenium.remote.RemoteWebDriver;
 
 import java.time.Duration;
 import java.util.List;
