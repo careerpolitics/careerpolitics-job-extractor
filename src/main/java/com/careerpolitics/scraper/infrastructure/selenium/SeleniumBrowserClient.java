@@ -69,6 +69,13 @@ public class SeleniumBrowserClient {
         return load(url, false, null, WebDriver::getPageSource, "");
     }
 
+    public String fetchTrendCsv(String url) {
+        if (!properties.selenium().enabled()) {
+            return "";
+        }
+        return load(url, false, null, this::downloadTrendCsv, "");
+    }
+
     public List<String> fetchTrendTitles(String url, int maxTrends) {
         if (!properties.selenium().enabled()) {
             return List.of();
@@ -140,6 +147,32 @@ public class SeleniumBrowserClient {
             sleep(properties.selenium().interactionDelayMs());
         }
         return List.of();
+    }
+
+    private String downloadTrendCsv(WebDriver driver) {
+        if (!(driver instanceof JavascriptExecutor javascriptExecutor)) {
+            return "";
+        }
+
+        installTrendCsvCapture(javascriptExecutor);
+        if (!clickTrendExportButton(driver)) {
+            log.warn("Unable to find Google Trends export button.");
+            return "";
+        }
+
+        sleep(Math.max(250, properties.selenium().interactionDelayMs()));
+        if (!clickDownloadCsvButton(driver, javascriptExecutor)) {
+            log.warn("Unable to find Google Trends 'Download CSV' action.");
+            return "";
+        }
+
+        String csv = awaitCapturedTrendCsv(javascriptExecutor, Duration.ofSeconds(Math.min(20, properties.selenium().timeoutSeconds())));
+        if (!csv.isBlank()) {
+            return csv;
+        }
+
+        log.warn("Google Trends CSV download was triggered but no CSV payload was captured.");
+        return "";
     }
 
     @SuppressWarnings("unchecked")
@@ -252,6 +285,151 @@ public class SeleniumBrowserClient {
             }
         }
         return titles;
+    }
+
+    private void installTrendCsvCapture(JavascriptExecutor javascriptExecutor) {
+        javascriptExecutor.executeScript("""
+                window.__trendCsvCapture = { csvText: '', href: '', fileName: '' };
+                if (window.__trendCsvCaptureInstalled) {
+                  return;
+                }
+
+                const storeCsvBlob = async (blob) => {
+                  if (!(blob instanceof Blob)) {
+                    return;
+                  }
+                  try {
+                    window.__trendCsvCapture.csvText = await blob.text();
+                  } catch (error) {
+                    console.debug('Unable to read Trends CSV blob', error);
+                  }
+                };
+
+                const originalCreateObjectURL = URL.createObjectURL.bind(URL);
+                URL.createObjectURL = function(object) {
+                  storeCsvBlob(object);
+                  return originalCreateObjectURL(object);
+                };
+
+                const originalAnchorClick = HTMLAnchorElement.prototype.click;
+                HTMLAnchorElement.prototype.click = function() {
+                  try {
+                    window.__trendCsvCapture.href = this.href || this.getAttribute('href') || '';
+                    window.__trendCsvCapture.fileName = this.download || '';
+                    if (window.__trendCsvCapture.href.startsWith('data:text/csv')) {
+                      const payload = window.__trendCsvCapture.href.substring(window.__trendCsvCapture.href.indexOf(',') + 1);
+                      window.__trendCsvCapture.csvText = decodeURIComponent(payload);
+                    }
+                  } catch (error) {
+                    console.debug('Unable to capture Trends CSV anchor click', error);
+                  }
+                  return originalAnchorClick.apply(this, arguments);
+                };
+
+                window.__trendCsvCaptureInstalled = true;
+                """);
+    }
+
+    private boolean clickTrendExportButton(WebDriver driver) {
+        return clickMatchingElement(driver, List.of(
+                By.xpath("//button[contains(translate(@aria-label, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'export')]"),
+                By.xpath("//*[(@role='button' or self::button) and contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'export')]")
+        ), "export");
+    }
+
+    private boolean clickDownloadCsvButton(WebDriver driver, JavascriptExecutor javascriptExecutor) {
+        if (clickMatchingElement(driver, List.of(
+                By.xpath("//a[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'download csv')]"),
+                By.xpath("//*[(@role='menuitem' or @role='button' or self::button) and contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'download csv')]")
+        ), "download csv")) {
+            return true;
+        }
+
+        Object clicked = javascriptExecutor.executeScript("""
+                const textOf = (el) => (el?.innerText || el?.textContent || '').trim().toLowerCase();
+                const candidates = Array.from(document.querySelectorAll('a, button, [role="menuitem"], [role="button"]'));
+                const target = candidates.find((element) => textOf(element).includes('download csv'));
+                if (!target) {
+                  return false;
+                }
+                target.click();
+                return true;
+                """);
+        return Boolean.TRUE.equals(clicked);
+    }
+
+    private boolean clickMatchingElement(WebDriver driver, List<By> selectors, String label) {
+        long deadline = System.nanoTime() + Duration.ofSeconds(Math.min(15, properties.selenium().timeoutSeconds())).toNanos();
+        while (System.nanoTime() < deadline) {
+            for (By selector : selectors) {
+                try {
+                    for (WebElement element : driver.findElements(selector)) {
+                        if (!element.isDisplayed()) {
+                            continue;
+                        }
+                        try {
+                            element.click();
+                            return true;
+                        } catch (Exception clickFailure) {
+                            if (driver instanceof JavascriptExecutor javascriptExecutor) {
+                                javascriptExecutor.executeScript("arguments[0].click();", element);
+                                return true;
+                            }
+                            log.debug("Failed JS-less click for {}: {}", label, clickFailure.getMessage());
+                        }
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+            sleep(250);
+        }
+        return false;
+    }
+
+    private String awaitCapturedTrendCsv(JavascriptExecutor javascriptExecutor, Duration timeout) {
+        Object result = javascriptExecutor.executeAsyncScript("""
+                const timeoutMs = arguments[0];
+                const callback = arguments[arguments.length - 1];
+                const startedAt = Date.now();
+
+                const tryResolve = async () => {
+                  const capture = window.__trendCsvCapture || {};
+                  if (capture.csvText) {
+                    callback(capture.csvText);
+                    return;
+                  }
+
+                  if (capture.href) {
+                    if (capture.href.startsWith('data:text/csv')) {
+                      const payload = capture.href.substring(capture.href.indexOf(',') + 1);
+                      callback(decodeURIComponent(payload));
+                      return;
+                    }
+
+                    if (capture.href.startsWith('http://') || capture.href.startsWith('https://')) {
+                      try {
+                        const response = await fetch(capture.href, { credentials: 'include' });
+                        if (response.ok) {
+                          callback(await response.text());
+                          return;
+                        }
+                      } catch (error) {
+                        console.debug('Unable to fetch Trends CSV href', error);
+                      }
+                    }
+                  }
+
+                  if (Date.now() - startedAt >= timeoutMs) {
+                    callback('');
+                    return;
+                  }
+                  setTimeout(tryResolve, 200);
+                };
+
+                tryResolve();
+                """, Math.max(2_000L, timeout.toMillis()));
+
+        return result instanceof String text ? text : "";
     }
 
     private int desiredPositive(int maxTrends) {
