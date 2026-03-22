@@ -2,7 +2,6 @@ package com.careerpolitics.scraper.infrastructure.selenium;
 
 import com.careerpolitics.scraper.config.TrendingProperties;
 import org.junit.jupiter.api.Test;
-import org.openqa.selenium.chrome.ChromeOptions;
 
 import java.time.Duration;
 import java.util.List;
@@ -10,15 +9,6 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class SeleniumBrowserClientTest {
-
-    @Test
-    void buildOptionsEnablesManagedDownloads() {
-        SeleniumBrowserClient client = new SeleniumBrowserClient(properties(true, "http://192.168.0.100:4444/wd/hub", ""));
-
-        ChromeOptions options = client.buildOptions(null);
-
-        assertThat(options.getCapability("se:downloadsEnabled")).isEqualTo(true);
-    }
 
     @Test
     void resolveNoVncUrlUsesRemoteHostForHeadfulSessions() {

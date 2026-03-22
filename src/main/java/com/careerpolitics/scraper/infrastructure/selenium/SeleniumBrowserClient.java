@@ -13,11 +13,7 @@ import org.openqa.selenium.remote.RemoteWebDriver;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -154,34 +150,36 @@ public class SeleniumBrowserClient {
     }
 
     private String downloadTrendCsv(WebDriver driver) {
-        RemoteWebDriver remoteDriver = driver instanceof RemoteWebDriver typedDriver ? typedDriver : null;
         JavascriptExecutor javascriptExecutor = driver instanceof JavascriptExecutor typedExecutor ? typedExecutor : null;
-
-        if (remoteDriver != null && remoteDriver.isDownloadsEnabled()) {
-            clearDownloadedFiles(remoteDriver);
+        if (javascriptExecutor == null) {
+            return "";
         }
 
-        if (javascriptExecutor != null) {
-            installTrendCsvCapture(javascriptExecutor);
-        }
+        installTrendCsvCapture(javascriptExecutor);
         if (!clickTrendExportButton(driver)) {
             log.warn("Unable to find Google Trends export button.");
             return "";
         }
 
         sleep(Math.max(250, properties.selenium().interactionDelayMs()));
-        if (!clickDownloadCsvButton(driver, javascriptExecutor)) {
+        WebElement downloadCsvElement = findDownloadCsvElement(driver, Duration.ofSeconds(Math.min(15, properties.selenium().timeoutSeconds())));
+        if (downloadCsvElement == null) {
             log.warn("Unable to find Google Trends 'Download CSV' action.");
             return "";
         }
 
         Duration timeout = Duration.ofSeconds(Math.min(20, properties.selenium().timeoutSeconds()));
-        String csv = remoteDriver == null ? "" : awaitDownloadedTrendCsv(remoteDriver, timeout);
+        String csv = readCsvDirectlyFromDownloadElement(javascriptExecutor, downloadCsvElement);
         if (!csv.isBlank()) {
             return csv;
         }
 
-        csv = javascriptExecutor == null ? "" : awaitCapturedTrendCsv(javascriptExecutor, timeout);
+        if (!clickElement(driver, downloadCsvElement, "download csv")) {
+            log.warn("Unable to click Google Trends 'Download CSV' action.");
+            return "";
+        }
+
+        csv = awaitCapturedTrendCsv(javascriptExecutor, timeout);
         if (!csv.isBlank()) {
             return csv;
         }
@@ -345,14 +343,6 @@ public class SeleniumBrowserClient {
                 """);
     }
 
-    private void clearDownloadedFiles(RemoteWebDriver driver) {
-        try {
-            driver.deleteDownloadableFiles();
-        } catch (Exception exception) {
-            log.debug("Unable to clear downloadable files before Trends CSV capture: {}", exception.getMessage());
-        }
-    }
-
     private boolean clickTrendExportButton(WebDriver driver) {
         return clickMatchingElement(driver, List.of(
                 By.xpath("//button[contains(translate(@aria-label, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'export')]"),
@@ -360,29 +350,46 @@ public class SeleniumBrowserClient {
         ), "export");
     }
 
-    private boolean clickDownloadCsvButton(WebDriver driver, JavascriptExecutor javascriptExecutor) {
-        if (clickMatchingElement(driver, List.of(
+    private WebElement findDownloadCsvElement(WebDriver driver, Duration timeout) {
+        return findMatchingElement(driver, List.of(
                 By.xpath("//a[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'download csv')]"),
                 By.xpath("//*[(@role='menuitem' or @role='button' or self::button) and contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'download csv')]")
-        ), "download csv")) {
-            return true;
-        }
+        ), timeout);
+    }
 
-        Object clicked = javascriptExecutor.executeScript("""
-                const textOf = (el) => (el?.innerText || el?.textContent || '').trim().toLowerCase();
-                const candidates = Array.from(document.querySelectorAll('a, button, [role="menuitem"], [role="button"]'));
-                const target = candidates.find((element) => textOf(element).includes('download csv'));
-                if (!target) {
-                  return false;
+    private String readCsvDirectlyFromDownloadElement(JavascriptExecutor javascriptExecutor, WebElement element) {
+        Object result = javascriptExecutor.executeAsyncScript("""
+                const element = arguments[0];
+                const callback = arguments[arguments.length - 1];
+                const href = element?.href || element?.getAttribute('href') || '';
+
+                if (!href) {
+                  callback('');
+                  return;
                 }
-                target.click();
-                return true;
-                """);
-        return Boolean.TRUE.equals(clicked);
+
+                if (href.startsWith('data:text/csv')) {
+                  const payload = href.substring(href.indexOf(',') + 1);
+                  callback(decodeURIComponent(payload));
+                  return;
+                }
+
+                fetch(href, { credentials: 'include' })
+                  .then((response) => response.ok ? response.text() : '')
+                  .then((text) => callback(text || ''))
+                  .catch(() => callback(''));
+                """, element);
+
+        return result instanceof String text ? text : "";
     }
 
     private boolean clickMatchingElement(WebDriver driver, List<By> selectors, String label) {
-        long deadline = System.nanoTime() + Duration.ofSeconds(Math.min(15, properties.selenium().timeoutSeconds())).toNanos();
+        WebElement element = findMatchingElement(driver, selectors, Duration.ofSeconds(Math.min(15, properties.selenium().timeoutSeconds())));
+        return element != null && clickElement(driver, element, label);
+    }
+
+    private WebElement findMatchingElement(WebDriver driver, List<By> selectors, Duration timeout) {
+        long deadline = System.nanoTime() + timeout.toNanos();
         while (System.nanoTime() < deadline) {
             for (By selector : selectors) {
                 try {
@@ -390,23 +397,28 @@ public class SeleniumBrowserClient {
                         if (!element.isDisplayed()) {
                             continue;
                         }
-                        try {
-                            element.click();
-                            return true;
-                        } catch (Exception clickFailure) {
-                            if (driver instanceof JavascriptExecutor javascriptExecutor) {
-                                javascriptExecutor.executeScript("arguments[0].click();", element);
-                                return true;
-                            }
-                            log.debug("Failed JS-less click for {}: {}", label, clickFailure.getMessage());
-                        }
+                        return element;
                     }
                 } catch (Exception ignored) {
                 }
             }
             sleep(250);
         }
-        return false;
+        return null;
+    }
+
+    private boolean clickElement(WebDriver driver, WebElement element, String label) {
+        try {
+            element.click();
+            return true;
+        } catch (Exception clickFailure) {
+            if (driver instanceof JavascriptExecutor javascriptExecutor) {
+                javascriptExecutor.executeScript("arguments[0].click();", element);
+                return true;
+            }
+            log.debug("Failed click for {}: {}", label, clickFailure.getMessage());
+            return false;
+        }
     }
 
     private String awaitCapturedTrendCsv(JavascriptExecutor javascriptExecutor, Duration timeout) {
@@ -455,72 +467,6 @@ public class SeleniumBrowserClient {
         return result instanceof String text ? text : "";
     }
 
-    private String awaitDownloadedTrendCsv(RemoteWebDriver driver, Duration timeout) {
-        try {
-            new WebDriverWait(driver, timeout).until(ignored -> hasDownloadedFiles(driver));
-            if (!hasDownloadedFiles(driver)) {
-                return "";
-            }
-
-            List<String> fileNames = driver.getDownloadableFiles();
-            String fileName = selectCsvFile(fileNames);
-            if (fileName.isBlank()) {
-                log.warn("Google Trends download completed, but no CSV file was present in Selenium-managed downloads: {}", fileNames);
-                return "";
-            }
-
-            Path tempDirectory = Files.createTempDirectory("google-trends-csv-");
-            try {
-                driver.downloadFile(fileName, tempDirectory);
-                Path csvPath = tempDirectory.resolve(fileName);
-                String csv = Files.readString(csvPath, StandardCharsets.UTF_8);
-                if (!csv.isBlank()) {
-                    return csv;
-                }
-            } finally {
-                deleteRecursively(tempDirectory);
-                clearDownloadedFiles(driver);
-            }
-        } catch (Exception exception) {
-            log.debug("Unable to retrieve Trends CSV from Selenium managed downloads: {}", exception.getMessage());
-        }
-        return "";
-    }
-
-    private boolean hasDownloadedFiles(RemoteWebDriver driver) {
-        try {
-            return !driver.getDownloadableFiles().isEmpty();
-        } catch (Exception exception) {
-            return false;
-        }
-    }
-
-    private String selectCsvFile(List<String> fileNames) {
-        for (int index = fileNames.size() - 1; index >= 0; index--) {
-            String fileName = fileNames.get(index);
-            if (fileName != null && fileName.toLowerCase(Locale.ROOT).endsWith(".csv")) {
-                return fileName;
-            }
-        }
-        return "";
-    }
-
-    private void deleteRecursively(Path path) {
-        if (path == null || !Files.exists(path)) {
-            return;
-        }
-        try (var stream = Files.walk(path)) {
-            stream.sorted((left, right) -> right.compareTo(left))
-                    .forEach(current -> {
-                        try {
-                            Files.deleteIfExists(current);
-                        } catch (IOException ignored) {
-                        }
-                    });
-        } catch (IOException ignored) {
-        }
-    }
-
     private int desiredPositive(int maxTrends) {
         return Math.max(1, maxTrends);
     }
@@ -550,7 +496,6 @@ public class SeleniumBrowserClient {
                 "--lang=en-US"
         );
         options.addArguments("--disable-blink-features=AutomationControlled");
-        options.setEnableDownloads(true);
         options.setExperimentalOption("excludeSwitches", List.of("enable-automation", "enable-logging"));
         options.setExperimentalOption("useAutomationExtension", false);
         options.setExperimentalOption("prefs", Map.of(
