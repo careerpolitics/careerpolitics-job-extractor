@@ -13,7 +13,11 @@ import org.openqa.selenium.remote.RemoteWebDriver;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -150,11 +154,16 @@ public class SeleniumBrowserClient {
     }
 
     private String downloadTrendCsv(WebDriver driver) {
-        if (!(driver instanceof JavascriptExecutor javascriptExecutor)) {
-            return "";
+        RemoteWebDriver remoteDriver = driver instanceof RemoteWebDriver typedDriver ? typedDriver : null;
+        JavascriptExecutor javascriptExecutor = driver instanceof JavascriptExecutor typedExecutor ? typedExecutor : null;
+
+        if (remoteDriver != null && remoteDriver.isDownloadsEnabled()) {
+            clearDownloadedFiles(remoteDriver);
         }
 
-        installTrendCsvCapture(javascriptExecutor);
+        if (javascriptExecutor != null) {
+            installTrendCsvCapture(javascriptExecutor);
+        }
         if (!clickTrendExportButton(driver)) {
             log.warn("Unable to find Google Trends export button.");
             return "";
@@ -166,7 +175,13 @@ public class SeleniumBrowserClient {
             return "";
         }
 
-        String csv = awaitCapturedTrendCsv(javascriptExecutor, Duration.ofSeconds(Math.min(20, properties.selenium().timeoutSeconds())));
+        Duration timeout = Duration.ofSeconds(Math.min(20, properties.selenium().timeoutSeconds()));
+        String csv = remoteDriver == null ? "" : awaitDownloadedTrendCsv(remoteDriver, timeout);
+        if (!csv.isBlank()) {
+            return csv;
+        }
+
+        csv = javascriptExecutor == null ? "" : awaitCapturedTrendCsv(javascriptExecutor, timeout);
         if (!csv.isBlank()) {
             return csv;
         }
@@ -330,6 +345,14 @@ public class SeleniumBrowserClient {
                 """);
     }
 
+    private void clearDownloadedFiles(RemoteWebDriver driver) {
+        try {
+            driver.deleteDownloadableFiles();
+        } catch (Exception exception) {
+            log.debug("Unable to clear downloadable files before Trends CSV capture: {}", exception.getMessage());
+        }
+    }
+
     private boolean clickTrendExportButton(WebDriver driver) {
         return clickMatchingElement(driver, List.of(
                 By.xpath("//button[contains(translate(@aria-label, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'export')]"),
@@ -432,6 +455,72 @@ public class SeleniumBrowserClient {
         return result instanceof String text ? text : "";
     }
 
+    private String awaitDownloadedTrendCsv(RemoteWebDriver driver, Duration timeout) {
+        try {
+            new WebDriverWait(driver, timeout).until(ignored -> hasDownloadedFiles(driver));
+            if (!hasDownloadedFiles(driver)) {
+                return "";
+            }
+
+            List<String> fileNames = driver.getDownloadableFiles();
+            String fileName = selectCsvFile(fileNames);
+            if (fileName.isBlank()) {
+                log.warn("Google Trends download completed, but no CSV file was present in Selenium-managed downloads: {}", fileNames);
+                return "";
+            }
+
+            Path tempDirectory = Files.createTempDirectory("google-trends-csv-");
+            try {
+                driver.downloadFile(fileName, tempDirectory);
+                Path csvPath = tempDirectory.resolve(fileName);
+                String csv = Files.readString(csvPath, StandardCharsets.UTF_8);
+                if (!csv.isBlank()) {
+                    return csv;
+                }
+            } finally {
+                deleteRecursively(tempDirectory);
+                clearDownloadedFiles(driver);
+            }
+        } catch (Exception exception) {
+            log.debug("Unable to retrieve Trends CSV from Selenium managed downloads: {}", exception.getMessage());
+        }
+        return "";
+    }
+
+    private boolean hasDownloadedFiles(RemoteWebDriver driver) {
+        try {
+            return !driver.getDownloadableFiles().isEmpty();
+        } catch (Exception exception) {
+            return false;
+        }
+    }
+
+    private String selectCsvFile(List<String> fileNames) {
+        for (int index = fileNames.size() - 1; index >= 0; index--) {
+            String fileName = fileNames.get(index);
+            if (fileName != null && fileName.toLowerCase(Locale.ROOT).endsWith(".csv")) {
+                return fileName;
+            }
+        }
+        return "";
+    }
+
+    private void deleteRecursively(Path path) {
+        if (path == null || !Files.exists(path)) {
+            return;
+        }
+        try (var stream = Files.walk(path)) {
+            stream.sorted((left, right) -> right.compareTo(left))
+                    .forEach(current -> {
+                        try {
+                            Files.deleteIfExists(current);
+                        } catch (IOException ignored) {
+                        }
+                    });
+        } catch (IOException ignored) {
+        }
+    }
+
     private int desiredPositive(int maxTrends) {
         return Math.max(1, maxTrends);
     }
@@ -461,6 +550,7 @@ public class SeleniumBrowserClient {
                 "--lang=en-US"
         );
         options.addArguments("--disable-blink-features=AutomationControlled");
+        options.setEnableDownloads(true);
         options.setExperimentalOption("excludeSwitches", List.of("enable-automation", "enable-logging"));
         options.setExperimentalOption("useAutomationExtension", false);
         options.setExperimentalOption("prefs", Map.of(
