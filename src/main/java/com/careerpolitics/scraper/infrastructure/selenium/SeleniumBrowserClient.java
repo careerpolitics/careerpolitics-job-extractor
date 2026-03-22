@@ -13,7 +13,9 @@ import org.openqa.selenium.remote.RemoteWebDriver;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.springframework.stereotype.Component;
 
+import java.net.URLEncoder;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -174,7 +176,12 @@ public class SeleniumBrowserClient {
             return "";
         }
 
-        String csv = awaitCapturedTrendCsv(javascriptExecutor, timeout);
+        String csv = readCsvFromDownloadedFile(driver, javascriptExecutor, downloadCsvElement, timeout);
+        if (!csv.isBlank()) {
+            return csv;
+        }
+
+        csv = awaitCapturedTrendCsv(javascriptExecutor, timeout);
         if (!csv.isBlank()) {
             return csv;
         }
@@ -381,6 +388,88 @@ public class SeleniumBrowserClient {
                 """, element);
 
         return result instanceof String text ? text : "";
+    }
+
+    private String readCsvFromDownloadedFile(WebDriver driver,
+                                             JavascriptExecutor javascriptExecutor,
+                                             WebElement downloadCsvElement,
+                                             Duration timeout) {
+        String fileName = resolveDownloadedCsvFileName(javascriptExecutor, downloadCsvElement);
+        if (fileName.isBlank()) {
+            return "";
+        }
+
+        try {
+            sleep(Math.max(500, properties.selenium().interactionDelayMs()));
+            String fileUrl = "file:///download/" + encodeFilePathSegment(fileName);
+            String originalWindow = driver.getWindowHandle();
+            var existingWindows = driver.getWindowHandles();
+
+            javascriptExecutor.executeScript("window.open(arguments[0], '_blank');", fileUrl);
+            new WebDriverWait(driver, timeout).until(ignored -> driver.getWindowHandles().size() > existingWindows.size());
+
+            String fileWindow = driver.getWindowHandles().stream()
+                    .filter(handle -> !existingWindows.contains(handle))
+                    .findFirst()
+                    .orElse(originalWindow);
+
+            driver.switchTo().window(fileWindow);
+            try {
+                new WebDriverWait(driver, timeout).until(ignored -> {
+                    String text = extractPageText(javascriptExecutor);
+                    return text != null && !text.isBlank();
+                });
+
+                return extractPageText(javascriptExecutor);
+            } finally {
+                if (!fileWindow.equals(originalWindow)) {
+                    driver.close();
+                }
+                driver.switchTo().window(originalWindow);
+            }
+        } catch (Exception exception) {
+            log.debug("Unable to read downloaded Trends CSV from /download/{}: {}", fileName, exception.getMessage());
+            return "";
+        }
+    }
+
+    private String resolveDownloadedCsvFileName(JavascriptExecutor javascriptExecutor, WebElement downloadCsvElement) {
+        Object result = javascriptExecutor.executeScript("""
+                const element = arguments[0];
+                const capturedFileName = window.__trendCsvCapture?.fileName || '';
+                if (capturedFileName) {
+                  return capturedFileName;
+                }
+
+                const downloadName = element?.download || element?.getAttribute('download') || '';
+                if (downloadName) {
+                  return downloadName;
+                }
+
+                const href = element?.href || element?.getAttribute('href') || '';
+                if (!href) {
+                  return '';
+                }
+
+                try {
+                  return new URL(href, window.location.href).pathname.split('/').pop() || '';
+                } catch (error) {
+                  return href.split('/').pop()?.split('?')[0] || '';
+                }
+                """, downloadCsvElement);
+
+        return result instanceof String text ? text.trim() : "";
+    }
+
+    private String extractPageText(JavascriptExecutor javascriptExecutor) {
+        Object result = javascriptExecutor.executeScript("""
+                return ((document.body && (document.body.innerText || document.body.textContent)) || '').trim();
+                """);
+        return result instanceof String text ? text.trim() : "";
+    }
+
+    private String encodeFilePathSegment(String fileName) {
+        return URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20");
     }
 
     private boolean clickMatchingElement(WebDriver driver, List<By> selectors, String label) {
