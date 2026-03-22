@@ -103,7 +103,7 @@ public class SeleniumBrowserClient {
 
                 return driver.getPageSource();
             } catch (SessionNotCreatedException exception) {
-                log.warn("Selenium session creation failed on attempt {}: {}", attempt, exception.getMessage());
+                log.error("Selenium session creation failed on attempt {}: {}", attempt, exception.getMessage(), exception);
                 break;
             } catch (Exception exception) {
                 log.warn("Selenium page load failed on attempt {} for {}: {}", attempt, url, exception.getMessage());

@@ -1,9 +1,10 @@
 services:
   app:
-    image: muraridevv/careerpolitics-trending-service:1.0-SNAPSHOT
+    image: ${IMAGE_NAME:-ghcr.io/careerpolitics/careerpolitics-job-extractor}:${IMAGE_TAG:-latest}
     container_name: careerpolitics-trending-service
+    restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "${APP_PORT:-8080}:8080"
     env_file:
       - .env
     environment:
@@ -25,11 +26,12 @@ services:
           memory: 384M
 
   selenium:
-    image: selenium/standalone-chrome:latest
+    image: ${SELENIUM_IMAGE:-selenium/standalone-chrome:latest}
     container_name: careerpolitics-selenium
+    restart: unless-stopped
     ports:
-      - "127.0.0.1:4444:4444"
-      - "127.0.0.1:7900:7900"
+      - "${SELENIUM_HOST_BIND:-127.0.0.1}:4444:4444"
+      - "${SELENIUM_VNC_HOST_BIND:-127.0.0.1}:7900:7900"
     shm_size: 1g
     environment:
       SE_VNC_NO_PASSWORD: 1

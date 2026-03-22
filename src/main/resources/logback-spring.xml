@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <springProperty scope="context" name="hbApiKey" source="HONEYBADGER_API_KEY" defaultValue=""/>
+    <springProperty scope="context" name="hbEnvironment" source="spring.profiles.active" defaultValue="default"/>
+    <springProperty scope="context" name="hbServiceName" source="spring.application.name" defaultValue="careerpolitics-trending-service"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} %-5level [%thread] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="HONEYBADGER" class="com.careerpolitics.scraper.infrastructure.observability.HoneybadgerLogAppender">
+        <apiKey>${hbApiKey}</apiKey>
+        <environment>${hbEnvironment}</environment>
+        <serviceName>${hbServiceName}</serviceName>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="HONEYBADGER"/>
+    </root>
+</configuration>

@@ -21,9 +21,43 @@ This repository now contains **only** the Article Trending workflow, with Seleni
 - `infrastructure/publisher`: outbound publishing adapter.
 - `infrastructure/persistence`: JPA history storage.
 
-## Why the Selenium version is still safer now
+## Honeybadger
 
-The original browser-driven implementation was CPU-heavy because it used large service classes and aggressive interaction logic. The current version keeps Selenium, but isolates it behind adapters, defaults to headless mode, bounds retries, reduces interaction steps, disables manual verification waits by default, and preserves scheduler overlap protection.
+The app supports a small Honeybadger setup for production errors and logs.
+
+Set this environment variable if you want Honeybadger enabled:
+
+```
+HONEYBADGER_API_KEY=your_project_api_key
+```
+
+Behavior:
+
+- Unhandled API exceptions are sent to Honeybadger as error notices.
+- `WARN` logs are forwarded as Honeybadger log events.
+- `ERROR` logs are forwarded as log events and also reported as Honeybadger errors, so operational failures show up in the main Honeybadger error feed.
+- The Honeybadger environment is derived from the active Spring profile.
+- Console logging still stays enabled.
+
+## GitHub Docker deployment pipeline
+
+A GitHub Actions workflow is included at `.github/workflows/docker-deploy.yml`.
+
+On pushes to `main` or manual runs, it:
+
+1. Runs `./gradlew test`.
+2. Builds a Docker image from `Dockerfile`.
+3. Pushes the image to GitHub Container Registry.
+4. Optionally deploys to your server with `docker compose` over SSH.
+
+To enable the deploy step, add these GitHub repository secrets:
+
+- `DEPLOY_HOST`
+- `DEPLOY_PORT` (optional)
+- `DEPLOY_USER`
+- `DEPLOY_SSH_KEY`
+- `DEPLOY_PATH`
+- `APP_ENV_FILE` (the full `.env` file content for the server)
 
 ## Local run
 

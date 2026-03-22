@@ -19,6 +19,7 @@ spring:
   jackson:
     default-property-inclusion: non_null
 
+
 careerpolitics:
   trending:
     discovery:
@@ -62,7 +63,6 @@ careerpolitics:
       max-news-per-trend: ${TRENDING_SCHEDULER_MAX_NEWS_PER_TREND:5}
       trend-cooldown-hours: ${TRENDING_SCHEDULER_TREND_COOLDOWN_HOURS:48}
       publish: ${TRENDING_SCHEDULER_PUBLISH:true}
-
 
 api:
   title: CareerPolitics Trending Service API
