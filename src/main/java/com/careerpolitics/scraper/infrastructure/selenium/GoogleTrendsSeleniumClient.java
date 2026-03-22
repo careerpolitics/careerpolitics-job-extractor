@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -26,6 +27,10 @@ public class GoogleTrendsSeleniumClient implements TrendDiscoveryClient {
 
     private static final String HEADLINE_ROW_SELECTOR = "tbody tr, [role=row], [data-row-id]";
     private static final String HEADLINE_TEXT_SELECTOR = "[data-term], .mZ3RIc, .QNIh4d, a[title]";
+    private static final List<String> ROW_METADATA_MARKERS = List.of(
+            "search volume", "started", "ended", "trend breakdown", "explore link",
+            "copy to clipboard", "download csv"
+    );
 
     private final SeleniumBrowserClient browserClient;
     private final TrendingProperties properties;
@@ -70,8 +75,17 @@ public class GoogleTrendsSeleniumClient implements TrendDiscoveryClient {
         }
 
         if (unique.isEmpty()) {
-            for (Element element : document.select(HEADLINE_TEXT_SELECTOR + ", td:nth-of-type(2)")) {
+            for (Element element : document.select(HEADLINE_TEXT_SELECTOR)) {
                 addIfValid(unique, normalizeCandidate(extractRawText(element)));
+            }
+        }
+
+        if (unique.isEmpty()) {
+            for (Element row : document.select(HEADLINE_ROW_SELECTOR)) {
+                for (String line : extractLineCandidates(extractRawText(row))) {
+                    addIfValid(unique, line);
+                    break;
+                }
             }
         }
 
@@ -85,7 +99,10 @@ public class GoogleTrendsSeleniumClient implements TrendDiscoveryClient {
                 return normalized;
             }
         }
-        return "";
+
+        return extractLineCandidates(extractRawText(row)).stream()
+                .findFirst()
+                .orElse("");
     }
 
     private String extractRawText(Element element) {
@@ -98,13 +115,37 @@ public class GoogleTrendsSeleniumClient implements TrendDiscoveryClient {
         if (!element.attr("title").isBlank()) {
             return element.attr("title");
         }
-        return element.text();
+        return element.wholeText();
     }
 
     private void addIfValid(LinkedHashMap<String, String> unique, String candidate) {
         if (isValidTrend(candidate)) {
             unique.putIfAbsent(trendNormalizer.slug(candidate), candidate);
         }
+    }
+
+    private List<String> extractLineCandidates(String raw) {
+        return Arrays.stream(raw.split("\\R+"))
+                .map(this::normalizeCandidate)
+                .filter(this::isLikelyHeadlineLine)
+                .toList();
+    }
+
+    private boolean isLikelyHeadlineLine(String value) {
+        if (!isValidTrend(value)) {
+            return false;
+        }
+        String normalized = value.toLowerCase(Locale.ROOT);
+        if (ROW_METADATA_MARKERS.stream().anyMatch(normalized::contains)) {
+            return false;
+        }
+        if (normalized.startsWith("./explore?") || normalized.startsWith("http://") || normalized.startsWith("https://")) {
+            return false;
+        }
+        if (value.contains(",") && value.split(",").length >= 3) {
+            return false;
+        }
+        return true;
     }
 
     private boolean isValidTrend(String value) {
@@ -121,6 +162,10 @@ public class GoogleTrendsSeleniumClient implements TrendDiscoveryClient {
                 .replaceAll("(?i)\\bactive\\b", "")
                 .replaceAll("(?i)\\b\\d+(?:[.,]\\d+)?(?:[KMB])?\\+?\\s*searches\\b", "")
                 .replaceAll("(?i)\\b(?:\\d+\\s*(?:sec(?:ond)?s?|min(?:ute)?s?|hr|hour|day|week|month)s?\\s+ago|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\s+\\d{1,2}|\\d{1,2}:\\d{2}\\s*(?:am|pm))\\b", "")
+                .replaceAll("(?i)\\b(?:search volume|started|ended|trend breakdown|explore link|copy to clipboard|download csv)\\b", "")
+                .replaceAll("(?i)\\bat\\s+\\d{1,2}:\\d{2}:\\d{2}\\s*(?:am|pm)?\\s*utc(?:[+-]\\d{1,2}(?::\\d{2})?)?", "")
+                .replaceAll("(?i)\\butc(?:[+-]\\d{1,2}(?::\\d{2})?)?\\b", "")
+                .replaceAll("\\s*[|•·]+\\s*", " ")
                 .replaceAll("\\s+", " ")
                 .trim();
     }

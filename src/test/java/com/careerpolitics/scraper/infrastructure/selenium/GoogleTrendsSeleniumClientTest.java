@@ -63,6 +63,42 @@ class GoogleTrendsSeleniumClientTest {
         assertEquals(List.of("AI Layoffs", "Federal Reserve"), client.parse(html, 5));
     }
 
+
+    @Test
+    void parsePrefersPrimaryTrendLineWhenRowsContainExportMetadata() {
+        GoogleTrendsSeleniumClient client = new GoogleTrendsSeleniumClient(null, properties(), new TrendNormalizer());
+
+        String html = """
+                <html><body>
+                  <table>
+                    <tbody>
+                      <tr>
+                        <td>
+                          jee mains session 2
+                          20K+ searches
+                          Started March 22, 2026 at 12:30:00 AM UTC+5:30
+                          Trend breakdown jee mains session 2, nta, jee main 2026 city slip, nta jee
+                          ./explore?q=jee%20mains%20session%202&geo=IN
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>
+                          bihar board
+                          2K+ searches
+                          Started March 22, 2026 at 7:30:00 AM UTC+5:30
+                          Ended March 22, 2026 at 3:00:00 PM UTC+5:30
+                          Trend breakdown bihar board, 12th result 2026, inter ka result kab aaega
+                          ./explore?q=bihar%20board&geo=IN
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </body></html>
+                """;
+
+        assertEquals(List.of("jee mains session 2", "bihar board"), client.parse(html, 5));
+    }
+
     private TrendingProperties properties() {
         return new TrendingProperties(
                 new TrendingProperties.Discovery("https://trends.google.com/trending", 5, List.of()),

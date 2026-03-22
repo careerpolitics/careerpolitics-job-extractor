@@ -151,12 +151,16 @@ public class SeleniumBrowserClient {
                 const maxTrends = arguments[0];
                 const rowSelectors = ['table tbody tr', 'tbody tr', '[role="row"]', '[data-row-id]'];
                 const titleSelectors = ['[data-term]', '.mZ3RIc', '.QNIh4d', 'a[title]'];
+                const metadataMarkers = [
+                  'search volume', 'started', 'ended', 'trend breakdown', 'explore link',
+                  'copy to clipboard', 'download csv'
+                ];
                 const noisePatterns = [
                   /^trending_up$/i,
                   /^active$/i,
-                  /^\\d+(?:[.,]\\d+)?(?:[KMB])?\\+?\\s*searches$/i,
-                  /^\\d+\\s*(?:sec(?:ond)?s?|min(?:ute)?s?|hr|hour|day|week|month)s?\\s+ago$/i,
-                  /^\\d{1,2}:\\d{2}\\s*(?:am|pm)$/i
+                  /^\d+(?:[.,]\d+)?(?:[KMB])?\+?\s*searches$/i,
+                  /^\d+\s*(?:sec(?:ond)?s?|min(?:ute)?s?|hr|hour|day|week|month)s?\s+ago$/i,
+                  /^\d{1,2}:\d{2}\s*(?:am|pm)$/i
                 ];
                 const seen = new Set();
                 const visible = (el) => {
@@ -166,16 +170,35 @@ public class SeleniumBrowserClient {
                   return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
                 };
                 const clean = (value) => (value || '')
-                  .replace(/\\b(?:trending_up|arrow_upward|timelapse)\\b/gi, ' ')
-                  .replace(/\\bactive\\b/gi, ' ')
-                  .replace(/\\b\\d+(?:[.,]\\d+)?(?:[KMB])?\\+?\\s*searches\\b/gi, ' ')
-                  .replace(/\\b(?:\\d+\\s*(?:sec(?:ond)?s?|min(?:ute)?s?|hr|hour|day|week|month)s?\\s+ago|\\d{1,2}:\\d{2}\\s*(?:am|pm))\\b/gi, ' ')
-                  .replace(/\\s+/g, ' ')
+                  .replace(/\b(?:trending_up|arrow_upward|timelapse)\b/gi, ' ')
+                  .replace(/\bactive\b/gi, ' ')
+                  .replace(/\b\d+(?:[.,]\d+)?(?:[KMB])?\+?\s*searches\b/gi, ' ')
+                  .replace(/\b(?:\d+\s*(?:sec(?:ond)?s?|min(?:ute)?s?|hr|hour|day|week|month)s?\s+ago|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}|\d{1,2}:\d{2}\s*(?:am|pm))\b/gi, ' ')
+                  .replace(/\b(?:search volume|started|ended|trend breakdown|explore link|copy to clipboard|download csv)\b/gi, ' ')
+                  .replace(/\bat\s+\d{1,2}:\d{2}:\d{2}\s*(?:am|pm)?\s*utc(?:[+-]\d{1,2}(?::\d{2})?)?/gi, ' ')
+                  .replace(/\butc(?:[+-]\d{1,2}(?::\d{2})?)?\b/gi, ' ')
+                  .replace(/\s*[|•·]+\s*/g, ' ')
+                  .replace(/\s+/g, ' ')
                   .trim();
                 const isNoise = (value) => !value || noisePatterns.some((pattern) => pattern.test(value));
+                const isLikelyHeadline = (value) => {
+                  if (!value || value.length < 3 || value.length > 120 || isNoise(value)) return false;
+                  const normalized = value.toLowerCase();
+                  if (metadataMarkers.some((marker) => normalized.includes(marker))) return false;
+                  if (normalized.startsWith('./explore?') || normalized.startsWith('http://') || normalized.startsWith('https://')) return false;
+                  if (value.includes(',') && value.split(',').length >= 3) return false;
+                  return true;
+                };
+                const extractLineCandidate = (value) => {
+                  for (const line of (value || '').split(/\r?\n+/)) {
+                    const cleaned = clean(line);
+                    if (isLikelyHeadline(cleaned)) return cleaned;
+                  }
+                  return '';
+                };
                 const pushCandidate = (output, candidate) => {
                   const cleaned = clean(candidate);
-                  if (cleaned.length < 3 || cleaned.length > 120 || isNoise(cleaned)) return;
+                  if (!isLikelyHeadline(cleaned)) return;
                   const slug = cleaned.toLowerCase();
                   if (seen.has(slug)) return;
                   seen.add(slug);
@@ -197,7 +220,11 @@ public class SeleniumBrowserClient {
                     if (!el) continue;
                     title = el.getAttribute('data-term') || el.getAttribute('title') || el.innerText || '';
                     title = clean(title);
-                    if (!isNoise(title)) break;
+                    if (isLikelyHeadline(title)) break;
+                    title = '';
+                  }
+                  if (!title) {
+                    title = extractLineCandidate(row.innerText || row.textContent || '');
                   }
                   pushCandidate(output, title);
                   if (output.length >= maxTrends) return output;
@@ -212,6 +239,7 @@ public class SeleniumBrowserClient {
                 }
                 return output;
                 """, desiredPositive(maxTrends));
+
 
         if (!(result instanceof Collection<?> collection)) {
             return List.of();
