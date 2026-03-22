@@ -169,17 +169,17 @@ public class SeleniumBrowserClient {
         }
 
         Duration timeout = Duration.ofSeconds(Math.min(20, properties.selenium().timeoutSeconds()));
-        String csv = readCsvDirectlyFromDownloadElement(javascriptExecutor, downloadCsvElement);
-        if (!csv.isBlank()) {
-            return csv;
-        }
-
         if (!clickElement(driver, downloadCsvElement, "download csv")) {
             log.warn("Unable to click Google Trends 'Download CSV' action.");
             return "";
         }
 
-        csv = awaitCapturedTrendCsv(javascriptExecutor, timeout);
+        String csv = awaitCapturedTrendCsv(javascriptExecutor, timeout);
+        if (!csv.isBlank()) {
+            return csv;
+        }
+
+        csv = readCsvDirectlyFromDownloadElement(javascriptExecutor, downloadCsvElement);
         if (!csv.isBlank()) {
             return csv;
         }
