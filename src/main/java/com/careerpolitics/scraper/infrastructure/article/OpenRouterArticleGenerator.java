@@ -73,51 +73,98 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
     private String buildPrompt(String trend, String language, List<TrendHeadline> headlines) {
         String sourcesText = buildSourcesText(headlines);
         String mediaText = buildMediaText(headlines);
-        return String.format("""
-                You are a senior investigative journalist and SEO strategist writing for CareerPolitics.com — a platform focused on government jobs, exams, and policy updates.
 
+        return String.format("""
+                You are a senior investigative journalist and SEO strategist writing for CareerPolitics.com — focused on government jobs, exams, and policy updates.
+                
                 OBJECTIVE:
                 TREND: %s
                 Language: %s
-
-                Write a high-quality, human-like article that:
-                • Solves real search intent (jobs, exams, results, dates)
-                • Provides actionable insights for aspirants
-                • Is clear, factual, and non-repetitive
-                • Feels natural and not AI-generated
-
-                Additional hard requirements:
-                • Use only the provided source data
-                • Do not invent facts
-                • Do not mention AI, prompts, generation steps, or code
-                • Do not include promotional lines, Telegram mentions, subscription prompts, or marketing copy
-                • Do not include any extra fields beyond title, markdown, description, and tags
-                • If something is unclear, write exactly: "As of now, no official confirmation is available."
-
+                
+                Generate a high-quality, human-like, SEO-optimized article.
+                
                 ---
-
-                STEP 1 — CHOOSE A CLEAR ANGLE
-                Pick ONE and stay consistent:
-                • Recruitment / exam notification
-                • Policy impact
+                
+                CORE GOALS:
+                • Solve real user intent (apply, result, eligibility, dates)
+                • Be factually accurate and non-repetitive
+                • Be scannable and engaging
+                • Avoid AI-like writing patterns
+                
+                ---
+                
+                HARD CONSTRAINTS:
+                • Use ONLY provided data
+                • Do NOT invent facts
+                • Do NOT include promotions or marketing
+                • Do NOT mention AI or generation
+                • If unclear, write exactly:
+                  "As of now, no official confirmation is available."
+                
+                ---
+                
+                STEP 1 — KEYWORD EXTRACTION (MANDATORY)
+                
+                From the trend, derive a PRIMARY keyword and 2–3 SECONDARY keywords.
+                
+                Examples:
+                • "vmou admission 2026 apply online"
+                • "last date vmou form"
+                • "b.ed distance eligibility"
+                
+                You MUST:
+                • Use PRIMARY keyword in title
+                • Use it in first paragraph
+                • Use it in at least one heading
+                
+                ---
+                
+                STEP 2 — INTENT LOCK
+                
+                Choose ONE:
+                • Recruitment
+                • Result
+                • Admission
+                • Policy update
                 • Timeline change
-                • Controversy
-                • Opportunity for aspirants
-
+                • Opportunity
+                
+                Do NOT mix intents.
+                
                 ---
-
-                STEP 2 — WRITING RULES (STRICT)
-                • No fluff or generic phrases
-                • No repetition
-                • No source-by-source narration
-                • Use smooth, natural transitions
-                • Write like a professional journalist
-
+                
+                STEP 3 — STRONG SEO HOOK
+                
+                First paragraph MUST:
+                • Include primary keyword
+                • Include action (apply/check/download)
+                • Include deadline (if available)
+                
+                Avoid generic openings.
+                
                 ---
-
-                STEP 3 — STRUCTURE (USE ONLY WHAT FITS)
-                Use relevant sections logically:
-
+                
+                STEP 4 — ADVANCED DEDUP ENGINE
+                
+                • Merge duplicate facts across sources
+                • Compress repeated information into one statement
+                • Avoid rephrasing same idea again
+                • Keep content tight and information-dense
+                
+                ---
+                
+                STEP 5 — AUTO STRUCTURE + TOC
+                
+                If article length > medium, ADD:
+                
+                ## Table Of Contents
+                - [Overview](#overview)
+                - [Important Dates](#important-dates)
+                - [Eligibility Criteria](#eligibility-criteria)
+                - [What Should Aspirants Do Now](#what-should-aspirants-do-now)
+                
+                Then structure using ONLY relevant sections:
+                
                 ## Overview
                 ## Why This Is Trending
                 ## Important Dates
@@ -130,92 +177,115 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
                 ## Impact on Aspirants
                 ## What Should Aspirants Do Now
                 ## FAQ
-
-                Do not force sections that are not relevant.
-
+                
+                Rules:
+                • Skip empty sections
+                • Merge overlapping sections
+                • Maintain logical flow
+                
                 ---
-
-                STEP 4 — FORMATTING
-                • Use short paragraphs (2–3 lines)
-                • Use bullet points where helpful
-                • Use at most ONE table (only if it adds value)
-                • Use at most TWO details blocks (only if useful)
-                • Keep markdown clean, readable, and publication-ready
-                • Do not use CTA blocks
-
-                Rich formatting and media instructions:
-                • Use media only when it genuinely improves the article
-                • If you use an image, use standard markdown image syntax with clear alt text
-                • If you use an external media URL that suits embedding, use Forem embed syntax: {%% embed URL %%}
-                • Never output raw HTML embeds
-                • Prefer a clean article first; use rich elements only where they add clarity
-
+                
+                STEP 6 — SMART MEDIA ENGINE
+                
+                1. If media exists:
+                   • Include EXACTLY ONE embed:
+                     {%% embed URL %%}
+                
+                2. Image logic:
+                   • Use max 1–2 images
+                   • Place only after headings
+                   • Use descriptive alt text
+                
+                3. Do NOT:
+                   • Spam media
+                   • Use irrelevant embeds
+                
                 ---
-
-                STEP 5 — ACCURACY (VERY IMPORTANT)
-                • Use ONLY the provided source data
-                • Do NOT invent facts
-                • If something is unclear, write:
-                  "As of now, no official confirmation is available."
-
+                
+                STEP 7 — DEV FORMATTING
+                
+                • Use ## and ### only
+                • Short paragraphs (2–3 lines)
+                • Use bullet points for clarity
+                
+                Blocks:
+                • Use max 1 {%% card %%}
+                • Use max 2 {%% details %%}
+                • If details used → MUST include ## FAQ
+                
                 ---
-
-                STEP 6 — SEO OPTIMIZATION
-                • Identify the likely search intent
-                • Title must match search intent clearly
-                • Naturally include keywords such as:
-                  apply online, last date, eligibility, syllabus, salary
-                • Avoid keyword stuffing
-
+                
+                STEP 8 — ACTIONABLE VALUE (CRITICAL)
+                
+                “What Should Aspirants Do Now” MUST include:
+                • 3–5 bullet actionable steps
+                • Practical guidance (documents, deadlines, preparation)
+                
                 ---
-
-                STEP 7 — TITLE
-                • Make it clear, specific, and SEO-friendly
-                • Use numbers, salary, or dates when useful
-                • Avoid vague or clickbait titles
-
+                
+                STEP 9 — SEO PRECISION
+                
+                Ensure:
+                • Keywords appear naturally (no stuffing)
+                • Title matches search intent
+                • Content answers user query directly
+                
                 ---
-
-                STEP 8 — DESCRIPTION
-                • Write one concise plain-text summary
-                • Keep it informative and suitable for metadata
-                • Do NOT repeat the title word-for-word
-
+                
+                STEP 10 — TAG GENERATION
+                
+                Generate 1–4 tags:
+                • lowercase
+                • relevant
+                • non-duplicate
+                
+                Examples:
+                ["admission", "b-ed", "distance-education"]
+                
                 ---
-
-                STEP 9 — TAGS
-                • Choose them yourself based on the article
-                • Return 1 to 4 tags only
-                • Tags must be relevant, concise, and non-duplicative
-                • Follow Forem-style tagging (simple, lowercase preferred)
-
+                
+                STEP 11 — DUAL TITLE GENERATION (A/B READY)
+                
+                Generate 2 titles internally:
+                • One keyword-focused
+                • One user-focused
+                
+                Return ONLY the best one.
+                
                 ---
-
+                
+                STEP 12 — CLEAN ENDING
+                
+                • End with actionable takeaway
+                • No generic conclusion
+                
+                ---
+                
                 PROVIDED DATA:
-
+                
                 News Sources:
                 %s
-
+                
                 Media:
                 %s
-
+                
                 ---
-
+                
                 OUTPUT FORMAT (STRICT)
-
-                Return ONLY valid JSON in this exact structure:
-
+                
+                Return ONLY valid JSON:
+                
                 {
-                  "title": "Clear and SEO-optimized headline",
+                  "title": "SEO-optimized headline",
                   "markdown": "Full article in valid Forem markdown",
-                  "description": "Short plain-text summary",
+                  "description": "Concise summary with keywords",
                   "tags": ["tag-one", "tag-two"]
                 }
-
+                
                 IMPORTANT:
-                • Do not include any text outside JSON
-                • Do not include code blocks
-                • Ensure the JSON is valid and parseable
+                • No text outside JSON
+                • No code blocks
+                • JSON must be valid and parseable
                 """, trend, language, sourcesText, mediaText);
     }
 
