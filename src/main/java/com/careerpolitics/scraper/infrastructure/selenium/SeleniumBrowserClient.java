@@ -29,6 +29,8 @@ import java.util.function.Function;
 @Component
 public class SeleniumBrowserClient {
 
+    private static final String SELENIUM_DOWNLOAD_DIRECTORY_URL = "file:///home/seluser/Downloads/";
+
     private static final String STEALTH_SCRIPT = """
             Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
             window.chrome = window.chrome || {runtime: {}};
@@ -396,12 +398,12 @@ public class SeleniumBrowserClient {
                                              Duration timeout) {
         String fileName = resolveDownloadedCsvFileName(javascriptExecutor, downloadCsvElement);
         if (fileName.isBlank()) {
-            return "";
+            return readLatestCsvFromDownloadsDirectory(driver, javascriptExecutor, timeout);
         }
 
         try {
             sleep(Math.max(500, properties.selenium().interactionDelayMs()));
-            String fileUrl = "file:///download/" + encodeFilePathSegment(fileName);
+            String fileUrl = SELENIUM_DOWNLOAD_DIRECTORY_URL + encodeFilePathSegment(fileName);
             String originalWindow = driver.getWindowHandle();
             var existingWindows = driver.getWindowHandles();
 
@@ -420,7 +422,10 @@ public class SeleniumBrowserClient {
                     return text != null && !text.isBlank();
                 });
 
-                return extractPageText(javascriptExecutor);
+                String csv = extractPageText(javascriptExecutor);
+                if (!csv.isBlank()) {
+                    return csv;
+                }
             } finally {
                 if (!fileWindow.equals(originalWindow)) {
                     driver.close();
@@ -428,9 +433,63 @@ public class SeleniumBrowserClient {
                 driver.switchTo().window(originalWindow);
             }
         } catch (Exception exception) {
-            log.debug("Unable to read downloaded Trends CSV from /download/{}: {}", fileName, exception.getMessage());
+            log.debug("Unable to read downloaded Trends CSV from /home/seluser/Downloads/{}: {}", fileName, exception.getMessage());
+        }
+
+        return readLatestCsvFromDownloadsDirectory(driver, javascriptExecutor, timeout);
+    }
+
+    private String readLatestCsvFromDownloadsDirectory(WebDriver driver,
+                                                       JavascriptExecutor javascriptExecutor,
+                                                       Duration timeout) {
+        try {
+            String originalWindow = driver.getWindowHandle();
+            var existingWindows = driver.getWindowHandles();
+
+            javascriptExecutor.executeScript("window.open(arguments[0], '_blank');", SELENIUM_DOWNLOAD_DIRECTORY_URL);
+            new WebDriverWait(driver, timeout).until(ignored -> driver.getWindowHandles().size() > existingWindows.size());
+
+            String directoryWindow = driver.getWindowHandles().stream()
+                    .filter(handle -> !existingWindows.contains(handle))
+                    .findFirst()
+                    .orElse(originalWindow);
+
+            driver.switchTo().window(directoryWindow);
+            try {
+                new WebDriverWait(driver, timeout).until(ignored -> resolveLatestDownloadedCsvHref(javascriptExecutor) != null);
+                String latestCsvHref = resolveLatestDownloadedCsvHref(javascriptExecutor);
+                if (latestCsvHref == null || latestCsvHref.isBlank()) {
+                    return "";
+                }
+
+                driver.get(latestCsvHref);
+                new WebDriverWait(driver, timeout).until(ignored -> {
+                    String text = extractPageText(javascriptExecutor);
+                    return text != null && !text.isBlank();
+                });
+                return extractPageText(javascriptExecutor);
+            } finally {
+                if (!directoryWindow.equals(originalWindow)) {
+                    driver.close();
+                }
+                driver.switchTo().window(originalWindow);
+            }
+        } catch (Exception exception) {
+            log.debug("Unable to read latest Trends CSV from /home/seluser/Downloads/: {}", exception.getMessage());
             return "";
         }
+    }
+
+    private String resolveLatestDownloadedCsvHref(JavascriptExecutor javascriptExecutor) {
+        Object result = javascriptExecutor.executeScript("""
+                const links = Array.from(document.querySelectorAll('a[href$=".csv"]'));
+                if (!links.length) {
+                  return null;
+                }
+                return links[links.length - 1].href || links[links.length - 1].getAttribute('href') || null;
+                """);
+
+        return result instanceof String text ? text.trim() : null;
     }
 
     private String resolveDownloadedCsvFileName(JavascriptExecutor javascriptExecutor, WebElement downloadCsvElement) {
