@@ -26,6 +26,43 @@ class GoogleTrendsSeleniumClientTest {
         assertEquals(List.of("March Madness", "AI Jobs"), client.parse(html, 5));
     }
 
+    @Test
+    void parseKeepsOnlyHeadlineTrendsWhenRowsContainBreakdownsAndUiNoise() {
+        GoogleTrendsSeleniumClient client = new GoogleTrendsSeleniumClient(null, properties(), new TrendNormalizer());
+
+        String html = """
+                <html><body>
+                  <table>
+                    <tbody>
+                      <tr>
+                        <td>1</td>
+                        <td>
+                          <div class='mZ3RIc'>AI Layoffs</div>
+                          <div>trending_up</div>
+                          <div>Active</div>
+                          <div>5K+ searches</div>
+                          <div>2 hours ago</div>
+                          <div class='trend-breakdown'>
+                            <a title='OpenAI jobs'>OpenAI jobs</a>
+                            <a title='Anthropic hiring'>Anthropic hiring</a>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>2</td>
+                        <td>
+                          <div data-term='Federal Reserve'></div>
+                          <div>10K+ searches</div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </body></html>
+                """;
+
+        assertEquals(List.of("AI Layoffs", "Federal Reserve"), client.parse(html, 5));
+    }
+
     private TrendingProperties properties() {
         return new TrendingProperties(
                 new TrendingProperties.Discovery("https://trends.google.com/trending", 5, List.of()),

@@ -16,10 +16,12 @@ import org.springframework.stereotype.Component;
 import java.net.URL;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
+import java.util.function.Function;
 
 @Slf4j
 @Component
@@ -64,20 +66,27 @@ public class SeleniumBrowserClient {
         if (!properties.selenium().enabled()) {
             return "";
         }
-        return load(url, false, null);
+        return load(url, false, null, WebDriver::getPageSource, "");
+    }
+
+    public List<String> fetchTrendTitles(String url, int maxTrends) {
+        if (!properties.selenium().enabled()) {
+            return List.of();
+        }
+        return load(url, false, null, driver -> extractTrendTitles(driver, maxTrends), List.of());
     }
 
     public String fetchNewsPage(String url, String trend) {
         if (!properties.selenium().enabled() || !properties.selenium().newsEnabled()) {
             return "";
         }
-        return load(url, true, trend);
+        return load(url, true, trend, WebDriver::getPageSource, "");
     }
 
-    private String load(String url, boolean newsMode, String trend) {
+    private <T> T load(String url, boolean newsMode, String trend, Function<WebDriver, T> extractor, T emptyValue) {
         if (properties.selenium().remoteUrl() == null || properties.selenium().remoteUrl().isBlank()) {
             log.warn("Selenium remote URL is not configured. Returning empty page source.");
-            return "";
+            return emptyValue;
         }
 
         int attempts = Math.max(1, properties.selenium().maxAttempts());
@@ -101,7 +110,7 @@ public class SeleniumBrowserClient {
                     continue;
                 }
 
-                return driver.getPageSource();
+                return extractor.apply(driver);
             } catch (SessionNotCreatedException exception) {
                 log.error("Selenium session creation failed on attempt {}: {}", attempt, exception.getMessage(), exception);
                 break;
@@ -117,7 +126,108 @@ public class SeleniumBrowserClient {
             }
             sleep(properties.selenium().sessionRetryBackoff().toMillis());
         }
-        return "";
+        return emptyValue;
+    }
+
+    private List<String> extractTrendTitles(WebDriver driver, int maxTrends) {
+        int desiredCount = Math.max(1, maxTrends);
+        for (int attempt = 0; attempt < 6; attempt++) {
+            List<String> titles = runTrendExtractionScript(driver, desiredCount);
+            if (!titles.isEmpty()) {
+                return titles.stream().limit(desiredCount).toList();
+            }
+            performLightInteraction(driver);
+            sleep(properties.selenium().interactionDelayMs());
+        }
+        return List.of();
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> runTrendExtractionScript(WebDriver driver, int maxTrends) {
+        if (!(driver instanceof JavascriptExecutor javascriptExecutor)) {
+            return List.of();
+        }
+        Object result = javascriptExecutor.executeScript("""
+                const maxTrends = arguments[0];
+                const rowSelectors = ['table tbody tr', 'tbody tr', '[role="row"]', '[data-row-id]'];
+                const titleSelectors = ['[data-term]', '.mZ3RIc', '.QNIh4d', 'a[title]'];
+                const noisePatterns = [
+                  /^trending_up$/i,
+                  /^active$/i,
+                  /^\\d+(?:[.,]\\d+)?(?:[KMB])?\\+?\\s*searches$/i,
+                  /^\\d+\\s*(?:sec(?:ond)?s?|min(?:ute)?s?|hr|hour|day|week|month)s?\\s+ago$/i,
+                  /^\\d{1,2}:\\d{2}\\s*(?:am|pm)$/i
+                ];
+                const seen = new Set();
+                const visible = (el) => {
+                  if (!el) return false;
+                  const style = window.getComputedStyle(el);
+                  const rect = el.getBoundingClientRect();
+                  return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+                };
+                const clean = (value) => (value || '')
+                  .replace(/\\b(?:trending_up|arrow_upward|timelapse)\\b/gi, ' ')
+                  .replace(/\\bactive\\b/gi, ' ')
+                  .replace(/\\b\\d+(?:[.,]\\d+)?(?:[KMB])?\\+?\\s*searches\\b/gi, ' ')
+                  .replace(/\\b(?:\\d+\\s*(?:sec(?:ond)?s?|min(?:ute)?s?|hr|hour|day|week|month)s?\\s+ago|\\d{1,2}:\\d{2}\\s*(?:am|pm))\\b/gi, ' ')
+                  .replace(/\\s+/g, ' ')
+                  .trim();
+                const isNoise = (value) => !value || noisePatterns.some((pattern) => pattern.test(value));
+                const pushCandidate = (output, candidate) => {
+                  const cleaned = clean(candidate);
+                  if (cleaned.length < 3 || cleaned.length > 120 || isNoise(cleaned)) return;
+                  const slug = cleaned.toLowerCase();
+                  if (seen.has(slug)) return;
+                  seen.add(slug);
+                  output.push(cleaned);
+                };
+                const rows = [];
+                for (const selector of rowSelectors) {
+                  const found = Array.from(document.querySelectorAll(selector)).filter(visible);
+                  if (found.length) {
+                    rows.push(...found);
+                    break;
+                  }
+                }
+                const output = [];
+                for (const row of rows) {
+                  let title = '';
+                  for (const selector of titleSelectors) {
+                    const el = Array.from(row.querySelectorAll(selector)).find(visible);
+                    if (!el) continue;
+                    title = el.getAttribute('data-term') || el.getAttribute('title') || el.innerText || '';
+                    title = clean(title);
+                    if (!isNoise(title)) break;
+                  }
+                  pushCandidate(output, title);
+                  if (output.length >= maxTrends) return output;
+                }
+                if (output.length) return output;
+                for (const selector of titleSelectors) {
+                  const elements = Array.from(document.querySelectorAll(selector)).filter(visible);
+                  for (const el of elements) {
+                    pushCandidate(output, el.getAttribute('data-term') || el.getAttribute('title') || el.innerText || '');
+                    if (output.length >= maxTrends) return output;
+                  }
+                }
+                return output;
+                """, desiredPositive(maxTrends));
+
+        if (!(result instanceof Collection<?> collection)) {
+            return List.of();
+        }
+
+        List<String> titles = new ArrayList<>();
+        for (Object value : collection) {
+            if (value instanceof String text && !text.isBlank()) {
+                titles.add(text.trim());
+            }
+        }
+        return titles;
+    }
+
+    private int desiredPositive(int maxTrends) {
+        return Math.max(1, maxTrends);
     }
 
     RemoteWebDriver createDriver(String proxy) throws Exception {
