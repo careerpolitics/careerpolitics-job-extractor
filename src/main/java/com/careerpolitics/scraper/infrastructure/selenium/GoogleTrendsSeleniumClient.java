@@ -1,8 +1,11 @@
 package com.careerpolitics.scraper.infrastructure.selenium;
 
 import com.careerpolitics.scraper.application.TrendNormalizer;
+import com.careerpolitics.scraper.domain.model.TrendDiscoveryCandidate;
+import com.careerpolitics.scraper.domain.model.TrendTopic;
 import com.careerpolitics.scraper.config.TrendingProperties;
 import com.careerpolitics.scraper.domain.port.TrendDiscoveryClient;
+import com.careerpolitics.scraper.domain.port.TrendTopicCleaner;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -11,6 +14,7 @@ import org.springframework.stereotype.Component;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -30,13 +34,16 @@ public class GoogleTrendsSeleniumClient implements TrendDiscoveryClient {
     private final SeleniumBrowserClient browserClient;
     private final TrendingProperties properties;
     private final TrendNormalizer trendNormalizer;
+    private final TrendTopicCleaner trendTopicCleaner;
 
     public GoogleTrendsSeleniumClient(SeleniumBrowserClient browserClient,
                                       TrendingProperties properties,
-                                      TrendNormalizer trendNormalizer) {
+                                      TrendNormalizer trendNormalizer,
+                                      TrendTopicCleaner trendTopicCleaner) {
         this.browserClient = browserClient;
         this.properties = properties;
         this.trendNormalizer = trendNormalizer;
+        this.trendTopicCleaner = trendTopicCleaner;
     }
 
     @Override
@@ -46,46 +53,90 @@ public class GoogleTrendsSeleniumClient implements TrendDiscoveryClient {
                 + "&hl=" + encode(language)
                 + "&category=9&status=active";
 
-        List<String> trends = browserClient.fetchTrendTitles(url, maxTrends);
-        if (!trends.isEmpty()) {
-            log.info("Discovered {} headline trends using Selenium DOM extraction for geo={} language={}", trends.size(), geo, language);
-            return trends;
-        }
-
         String html = browserClient.fetchTrendsPage(url);
         if (html.isBlank()) {
             return properties.discovery().fallbackTrends() == null ? List.of() : properties.discovery().fallbackTrends();
         }
-        trends = parse(html, maxTrends);
-        log.info("Discovered {} trends using Selenium HTML fallback for geo={} language={}", trends.size(), geo, language);
+        List<String> trends = parse(html, maxTrends);
+        log.info("Discovered {} trends using Selenium HTML + AI topic cleaning for geo={} language={}", trends.size(), geo, language);
         return trends;
     }
 
     List<String> parse(String html, int maxTrends) {
         Document document = Jsoup.parse(html);
-        LinkedHashMap<String, String> unique = new LinkedHashMap<>();
+        List<TrendDiscoveryCandidate> candidates = new ArrayList<>();
 
         for (Element row : document.select(HEADLINE_ROW_SELECTOR)) {
-            addIfValid(unique, extractHeadlineFromRow(row));
-        }
-
-        if (unique.isEmpty()) {
-            for (Element element : document.select(HEADLINE_TEXT_SELECTOR + ", td:nth-of-type(2)")) {
-                addIfValid(unique, normalizeCandidate(extractRawText(element)));
+            TrendDiscoveryCandidate candidate = extractCandidateFromRow(row);
+            if (isUsableCandidate(candidate)) {
+                candidates.add(candidate);
             }
         }
 
+        if (candidates.isEmpty()) {
+            for (Element element : document.select(HEADLINE_TEXT_SELECTOR + ", td:nth-of-type(2)")) {
+                String normalized = normalizeCandidate(extractRawText(element));
+                if (isValidTrend(normalized)) {
+                    candidates.add(new TrendDiscoveryCandidate(normalized, List.of(), normalized));
+                }
+            }
+        }
+
+        List<TrendTopic> topics = trendTopicCleaner.cleanTopics(candidates, maxTrends);
+        if (!topics.isEmpty()) {
+            return topics.stream()
+                    .collect(java.util.stream.Collectors.toMap(
+                            TrendTopic::slug,
+                            TrendTopic::name,
+                            (left, right) -> left,
+                            LinkedHashMap::new
+                    ))
+                    .values().stream()
+                    .limit(Math.max(1, maxTrends))
+                    .toList();
+        }
+
+        LinkedHashMap<String, String> unique = new LinkedHashMap<>();
+        for (TrendDiscoveryCandidate candidate : candidates) {
+            addIfValid(unique, trendNormalizer.clean(candidate.title()));
+            if (candidate.breakdowns() != null) {
+                for (String breakdown : candidate.breakdowns()) {
+                    addIfValid(unique, trendNormalizer.clean(breakdown));
+                }
+            }
+        }
         return unique.values().stream().limit(Math.max(1, maxTrends)).toList();
     }
 
-    private String extractHeadlineFromRow(Element row) {
+    private TrendDiscoveryCandidate extractCandidateFromRow(Element row) {
+        String headline = "";
         for (Element candidate : row.select(HEADLINE_TEXT_SELECTOR)) {
             String normalized = normalizeCandidate(extractRawText(candidate));
             if (isValidTrend(normalized)) {
-                return normalized;
+                headline = normalized;
+                break;
             }
         }
-        return "";
+
+        List<String> breakdowns = row.select("a[title], a, [data-term], .trend-breakdown *").stream()
+                .map(this::extractRawText)
+                .map(this::normalizeCandidate)
+                .filter(this::isValidTrend)
+                .filter(value -> !value.equalsIgnoreCase(headline))
+                .distinct()
+                .limit(8)
+                .toList();
+
+        String rawText = normalizeCandidate(row.text());
+        return new TrendDiscoveryCandidate(headline, breakdowns, rawText);
+    }
+
+    private boolean isUsableCandidate(TrendDiscoveryCandidate candidate) {
+        return candidate != null && (
+                isValidTrend(candidate.title())
+                        || (candidate.breakdowns() != null && candidate.breakdowns().stream().anyMatch(this::isValidTrend))
+                        || isValidTrend(candidate.rawText())
+        );
     }
 
     private String extractRawText(Element element) {
