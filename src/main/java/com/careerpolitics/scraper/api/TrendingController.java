@@ -76,7 +76,7 @@ public class TrendingController {
                               "trendCooldownHours": 48,
                               "publish": false,
                               "requestedTrends": [
-                                "some-trends"
+                                "some_trends"
                               ],
                               "articleApiToken": "token_key",
                               "organization_id": 0

@@ -1,5 +1,6 @@
 package com.careerpolitics.scraper.application;
 
+import com.careerpolitics.scraper.domain.model.TrendTopic;
 import com.careerpolitics.scraper.domain.port.TrendHistoryStore;
 import org.springframework.stereotype.Service;
 
@@ -19,17 +20,16 @@ public class TrendSelectionService {
         this.trendNormalizer = trendNormalizer;
     }
 
-    public List<String> pickFreshTrends(List<String> discoveredTrends, int maxTrends, int cooldownHours) {
+    public List<TrendTopic> pickFreshTrends(List<TrendTopic> discoveredTrends, int maxTrends, int cooldownHours) {
         if (discoveredTrends == null || discoveredTrends.isEmpty()) {
             return List.of();
         }
 
-        LinkedHashMap<String, String> uniqueBySlug = new LinkedHashMap<>();
-        for (String trend : discoveredTrends) {
-            String cleanedTrend = trendNormalizer.clean(trend);
-            String slug = trendNormalizer.slug(cleanedTrend);
-            if (!cleanedTrend.isBlank() && !slug.isBlank()) {
-                uniqueBySlug.putIfAbsent(slug, cleanedTrend);
+        LinkedHashMap<String, TrendTopic> uniqueBySlug = new LinkedHashMap<>();
+        for (TrendTopic trend : discoveredTrends) {
+            TrendTopic normalizedTopic = normalize(trend);
+            if (!normalizedTopic.name().isBlank() && !normalizedTopic.slug().isBlank()) {
+                uniqueBySlug.putIfAbsent(normalizedTopic.slug(), normalizedTopic);
             }
         }
 
@@ -39,13 +39,44 @@ public class TrendSelectionService {
 
         Set<String> recentlyUsed = trendHistoryStore.findUsedSince(LocalDateTime.now().minusHours(cooldownHours));
         return uniqueBySlug.entrySet().stream()
-                .filter(entry -> !recentlyUsed.contains(entry.getKey()))
                 .map(java.util.Map.Entry::getValue)
+                .filter(topic -> isFresh(topic, recentlyUsed))
                 .limit(Math.max(1, maxTrends))
                 .toList();
     }
 
-    public void remember(String trend, boolean published) {
-        trendHistoryStore.save(trend, published);
+    public void remember(TrendTopic trendTopic, boolean published) {
+        trendHistoryStore.save(normalize(trendTopic), published);
+    }
+
+    private TrendTopic normalize(TrendTopic trendTopic) {
+        if (trendTopic == null) {
+            return new TrendTopic("", "", List.of());
+        }
+        String name = trendNormalizer.clean(trendTopic.name());
+        String slug = trendNormalizer.slug(name);
+        LinkedHashMap<String, String> keywords = new LinkedHashMap<>();
+        if (!name.isBlank() && !slug.isBlank()) {
+            keywords.putIfAbsent(slug, name);
+        }
+        if (trendTopic.keywords() != null) {
+            for (String keyword : trendTopic.keywords()) {
+                String cleanedKeyword = trendNormalizer.clean(keyword);
+                String keywordSlug = trendNormalizer.slug(cleanedKeyword);
+                if (!cleanedKeyword.isBlank() && !keywordSlug.isBlank()) {
+                    keywords.putIfAbsent(keywordSlug, cleanedKeyword);
+                }
+            }
+        }
+        return new TrendTopic(name, slug, List.copyOf(keywords.values()));
+    }
+
+    private boolean isFresh(TrendTopic topic, Set<String> recentlyUsed) {
+        if (recentlyUsed.contains(topic.slug())) {
+            return false;
+        }
+        return topic.keywords() == null || topic.keywords().stream()
+                .map(trendNormalizer::slug)
+                .noneMatch(recentlyUsed::contains);
     }
 }

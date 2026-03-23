@@ -2,57 +2,46 @@ package com.careerpolitics.scraper.infrastructure.selenium;
 
 import com.careerpolitics.scraper.application.TrendNormalizer;
 import com.careerpolitics.scraper.config.TrendingProperties;
+import com.careerpolitics.scraper.domain.model.TrendTopic;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GoogleTrendsSeleniumClientTest {
 
     @Test
-    void parseReturnsUniqueVisibleTrendTerms() {
-        GoogleTrendsSeleniumClient client = new GoogleTrendsSeleniumClient(null, properties(), new TrendNormalizer());
+    void parseExtractsTrendTableHtmlAndDelegatesToAiCleaner() {
+        StringBuilder capturedTableHtml = new StringBuilder();
+        GoogleTrendsSeleniumClient client = new GoogleTrendsSeleniumClient(
+                null,
+                properties(),
+                new TrendNormalizer(),
+                (tableHtml, maxTopics) -> {
+                    capturedTableHtml.append(tableHtml);
+                    return List.of(
+                            new TrendTopic("AI Hiring", "ai-hiring", List.of("AI Layoffs", "OpenAI jobs", "Anthropic hiring")),
+                            new TrendTopic("Federal Reserve", "federal-reserve", List.of("Federal Reserve", "Fed meeting"))
+                    );
+                }
+        );
 
         String html = """
                 <html><body>
-                  <div class='mZ3RIc'>March Madness</div>
-                  <div class='mZ3RIc'>March Madness</div>
-                  <div data-term='AI Jobs'></div>
-                </body></html>
-                """;
-
-        assertEquals(List.of("March Madness", "AI Jobs"), client.parse(html, 5));
-    }
-
-    @Test
-    void parseKeepsOnlyHeadlineTrendsWhenRowsContainBreakdownsAndUiNoise() {
-        GoogleTrendsSeleniumClient client = new GoogleTrendsSeleniumClient(null, properties(), new TrendNormalizer());
-
-        String html = """
-                <html><body>
+                  <div>ignored wrapper</div>
                   <table>
                     <tbody>
                       <tr>
                         <td>1</td>
                         <td>
                           <div class='mZ3RIc'>AI Layoffs</div>
-                          <div>trending_up</div>
-                          <div>Active</div>
-                          <div>5K+ searches</div>
-                          <div>2 hours ago</div>
                           <div class='trend-breakdown'>
                             <a title='OpenAI jobs'>OpenAI jobs</a>
                             <a title='Anthropic hiring'>Anthropic hiring</a>
                           </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>2</td>
-                        <td>
-                          <div data-term='Federal Reserve'></div>
-                          <div>10K+ searches</div>
                         </td>
                       </tr>
                     </tbody>
@@ -60,7 +49,22 @@ class GoogleTrendsSeleniumClientTest {
                 </body></html>
                 """;
 
-        assertEquals(List.of("AI Layoffs", "Federal Reserve"), client.parse(html, 5));
+        assertEquals(List.of("AI Hiring", "Federal Reserve"), client.parse(html, 5).stream().map(TrendTopic::name).toList());
+        assertTrue(capturedTableHtml.toString().contains("<table>"));
+        assertTrue(capturedTableHtml.toString().contains("OpenAI jobs"));
+        assertTrue(capturedTableHtml.toString().contains("Anthropic hiring"));
+    }
+
+    @Test
+    void parseReturnsEmptyWhenNoTrendTableExists() {
+        GoogleTrendsSeleniumClient client = new GoogleTrendsSeleniumClient(
+                null,
+                properties(),
+                new TrendNormalizer(),
+                (tableHtml, maxTopics) -> List.of(new TrendTopic("Unexpected", "unexpected", List.of("Unexpected")))
+        );
+
+        assertEquals(List.of(), client.parse("<html><body><div>No table</div></body></html>", 5));
     }
 
     private TrendingProperties properties() {

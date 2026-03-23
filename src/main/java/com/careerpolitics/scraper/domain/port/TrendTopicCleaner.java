@@ -4,6 +4,7 @@ import com.careerpolitics.scraper.domain.model.TrendTopic;
 
 import java.util.List;
 
-public interface TrendDiscoveryClient {
-    List<TrendTopic> discover(String geo, String language, int maxTrends);
+public interface TrendTopicCleaner {
+
+    List<TrendTopic> cleanTopics(String tableHtml, int maxTopics);
 }
