@@ -10,7 +10,6 @@ import com.careerpolitics.scraper.domain.port.ArticlePublisher;
 import com.careerpolitics.scraper.domain.port.TrendDiscoveryClient;
 import com.careerpolitics.scraper.domain.port.TrendHeadlineDetailClient;
 import com.careerpolitics.scraper.domain.port.TrendNewsClient;
-import com.careerpolitics.scraper.domain.port.TrendTopicCleaner;
 import com.careerpolitics.scraper.domain.request.TrendingArticleRequest;
 import com.careerpolitics.scraper.domain.response.TrendingArticleResponse;
 import jakarta.persistence.EntityNotFoundException;
@@ -31,22 +30,19 @@ public class TrendingWorkflowService {
     private final ArticleGenerator articleGenerator;
     private final ArticlePublisher articlePublisher;
     private final TrendHeadlineDetailClient trendHeadlineDetailClient;
-    private final TrendTopicCleaner trendTopicCleaner;
 
     public TrendingWorkflowService(TrendDiscoveryClient trendDiscoveryClient,
                                    TrendNewsClient trendNewsClient,
                                    TrendSelectionService trendSelectionService,
                                    ArticleGenerator articleGenerator,
                                    ArticlePublisher articlePublisher,
-                                   TrendHeadlineDetailClient trendHeadlineDetailClient,
-                                   TrendTopicCleaner trendTopicCleaner) {
+                                   TrendHeadlineDetailClient trendHeadlineDetailClient) {
         this.trendDiscoveryClient = trendDiscoveryClient;
         this.trendNewsClient = trendNewsClient;
         this.trendSelectionService = trendSelectionService;
         this.articleGenerator = articleGenerator;
         this.articlePublisher = articlePublisher;
         this.trendHeadlineDetailClient = trendHeadlineDetailClient;
-        this.trendTopicCleaner = trendTopicCleaner;
     }
 
     public TrendingArticleResponse generate(TrendingArticleRequest request) {
@@ -176,21 +172,11 @@ public class TrendingWorkflowService {
 
     private List<TrendTopic> discoverCandidateTrends(TrendingArticleRequest request) {
         if (request.getRequestedTrends() != null && !request.getRequestedTrends().isEmpty()) {
-            List<String> requestedTrendNames = request.getRequestedTrends().stream()
+            List<TrendTopic> requestedTrends = request.getRequestedTrends().stream()
                     .map(String::trim)
                     .filter(value -> !value.isBlank())
-                    .limit(request.getMaxTrends())
-                    .toList();
-            List<TrendTopic> normalizedRequestedTrends = trendTopicCleaner.cleanTopics(
-                    buildRequestedTrendsTable(requestedTrendNames),
-                    request.getMaxTrends()
-            );
-            if (!normalizedRequestedTrends.isEmpty()) {
-                log.info("Normalized {} requested trends into {} AI topics for article generation.", requestedTrendNames.size(), normalizedRequestedTrends.size());
-                return normalizedRequestedTrends;
-            }
-            List<TrendTopic> requestedTrends = requestedTrendNames.stream()
                     .map(value -> new TrendTopic(value, value.toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("(^-|-$)", ""), List.of(value)))
+                    .limit(request.getMaxTrends())
                     .toList();
             log.info("Using {} requested trends from request instead of Selenium discovery.", requestedTrends.size());
             return requestedTrends;
@@ -200,25 +186,5 @@ public class TrendingWorkflowService {
 
     private List<TrendHeadline> deduplicateHeadlines(List<TrendHeadline> headlines) {
         return new ArrayList<>(new LinkedHashSet<>(headlines));
-    }
-
-    private String buildRequestedTrendsTable(List<String> requestedTrendNames) {
-        StringBuilder table = new StringBuilder("<table><tbody>");
-        for (String requestedTrendName : requestedTrendNames) {
-            table.append("<tr><td>")
-                    .append(escapeHtml(requestedTrendName))
-                    .append("</td></tr>");
-        }
-        table.append("</tbody></table>");
-        return table.toString();
-    }
-
-    private String escapeHtml(String value) {
-        return value
-                .replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\"", "&quot;")
-                .replace("'", "&#39;");
     }
 }

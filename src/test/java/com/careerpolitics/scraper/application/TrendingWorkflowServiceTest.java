@@ -10,7 +10,6 @@ import com.careerpolitics.scraper.domain.port.ArticlePublisher;
 import com.careerpolitics.scraper.domain.port.TrendDiscoveryClient;
 import com.careerpolitics.scraper.domain.port.TrendHeadlineDetailClient;
 import com.careerpolitics.scraper.domain.port.TrendNewsClient;
-import com.careerpolitics.scraper.domain.port.TrendTopicCleaner;
 import com.careerpolitics.scraper.domain.request.TrendingArticleRequest;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -36,15 +35,13 @@ class TrendingWorkflowServiceTest {
         ArticleGenerator articleGenerator = Mockito.mock(ArticleGenerator.class);
         ArticlePublisher articlePublisher = Mockito.mock(ArticlePublisher.class);
         TrendHeadlineDetailClient trendHeadlineDetailClient = Mockito.mock(TrendHeadlineDetailClient.class);
-        TrendTopicCleaner trendTopicCleaner = Mockito.mock(TrendTopicCleaner.class);
         TrendingWorkflowService service = new TrendingWorkflowService(
                 trendDiscoveryClient,
                 trendNewsClient,
                 trendSelectionService,
                 articleGenerator,
                 articlePublisher,
-                trendHeadlineDetailClient,
-                trendTopicCleaner
+                trendHeadlineDetailClient
         );
 
         List<TrendHeadline> headlines = List.of(
@@ -78,15 +75,13 @@ class TrendingWorkflowServiceTest {
         ArticleGenerator articleGenerator = Mockito.mock(ArticleGenerator.class);
         ArticlePublisher articlePublisher = Mockito.mock(ArticlePublisher.class);
         TrendHeadlineDetailClient trendHeadlineDetailClient = Mockito.mock(TrendHeadlineDetailClient.class);
-        TrendTopicCleaner trendTopicCleaner = Mockito.mock(TrendTopicCleaner.class);
         TrendingWorkflowService service = new TrendingWorkflowService(
                 trendDiscoveryClient,
                 trendNewsClient,
                 trendSelectionService,
                 articleGenerator,
                 articlePublisher,
-                trendHeadlineDetailClient,
-                trendTopicCleaner
+                trendHeadlineDetailClient
         );
 
         TrendTopic aiJobs = new TrendTopic("AI Jobs", "ai-jobs", List.of("AI Jobs", "OpenAI jobs"));
@@ -116,15 +111,13 @@ class TrendingWorkflowServiceTest {
         ArticleGenerator articleGenerator = Mockito.mock(ArticleGenerator.class);
         ArticlePublisher articlePublisher = Mockito.mock(ArticlePublisher.class);
         TrendHeadlineDetailClient trendHeadlineDetailClient = Mockito.mock(TrendHeadlineDetailClient.class);
-        TrendTopicCleaner trendTopicCleaner = Mockito.mock(TrendTopicCleaner.class);
         TrendingWorkflowService service = new TrendingWorkflowService(
                 trendDiscoveryClient,
                 trendNewsClient,
                 trendSelectionService,
                 articleGenerator,
                 articlePublisher,
-                trendHeadlineDetailClient,
-                trendTopicCleaner
+                trendHeadlineDetailClient
         );
 
         List<TrendHeadline> headlines = List.of(
@@ -149,45 +142,5 @@ class TrendingWorkflowServiceTest {
 
         verify(articlePublisher).publish(anyString(), anyString(), anyString(), anyList(), anyString(), anyList(), any());
         verify(trendSelectionService, never()).remember(any(TrendTopic.class), anyBoolean());
-    }
-
-    @Test
-    void requestedTrendsAlsoUseAiTopicCleanerForArticleGeneration() {
-        TrendDiscoveryClient trendDiscoveryClient = Mockito.mock(TrendDiscoveryClient.class);
-        TrendNewsClient trendNewsClient = Mockito.mock(TrendNewsClient.class);
-        TrendSelectionService trendSelectionService = Mockito.mock(TrendSelectionService.class);
-        ArticleGenerator articleGenerator = Mockito.mock(ArticleGenerator.class);
-        ArticlePublisher articlePublisher = Mockito.mock(ArticlePublisher.class);
-        TrendHeadlineDetailClient trendHeadlineDetailClient = Mockito.mock(TrendHeadlineDetailClient.class);
-        TrendTopicCleaner trendTopicCleaner = Mockito.mock(TrendTopicCleaner.class);
-        TrendingWorkflowService service = new TrendingWorkflowService(
-                trendDiscoveryClient,
-                trendNewsClient,
-                trendSelectionService,
-                articleGenerator,
-                articlePublisher,
-                trendHeadlineDetailClient,
-                trendTopicCleaner
-        );
-
-        TrendTopic groupedTopic = new TrendTopic("AI Hiring", "ai-hiring", List.of("OpenAI jobs", "Anthropic hiring"));
-        when(trendTopicCleaner.cleanTopics(anyString(), anyInt())).thenReturn(List.of(groupedTopic));
-        when(trendSelectionService.pickFreshTrends(anyList(), anyInt(), anyInt())).thenReturn(List.of(groupedTopic));
-        when(trendNewsClient.discover(anyString(), anyString(), anyString(), anyInt())).thenReturn(List.of());
-        when(trendHeadlineDetailClient.enrich(List.of())).thenReturn(List.of());
-        when(articleGenerator.generate(anyString(), anyString(), anyList())).thenReturn(
-                new GeneratedArticleDraft("Title", "Markdown", List.of("tag1"), "Description", "open-router")
-        );
-        when(articlePublisher.publish(anyString(), anyString(), anyString(), anyList(), anyString(), anyList(), any())).thenReturn(
-                new PublishingResult(true, "Stored as draft.", null)
-        );
-
-        TrendingArticleRequest request = new TrendingArticleRequest();
-        request.setPublish(false);
-        request.setRequestedTrends(List.of("OpenAI jobs", "Anthropic hiring"));
-        service.generate(request);
-
-        verify(trendTopicCleaner).cleanTopics(anyString(), anyInt());
-        verify(trendDiscoveryClient, never()).discover(anyString(), anyString(), anyInt());
     }
 }
