@@ -4,6 +4,7 @@ import com.careerpolitics.scraper.domain.model.GeneratedArticle;
 import com.careerpolitics.scraper.domain.model.GeneratedArticleDraft;
 import com.careerpolitics.scraper.domain.model.PublishingResult;
 import com.careerpolitics.scraper.domain.model.TrendHeadline;
+import com.careerpolitics.scraper.domain.model.TrendTopic;
 import com.careerpolitics.scraper.domain.port.ArticleGenerator;
 import com.careerpolitics.scraper.domain.port.ArticlePublisher;
 import com.careerpolitics.scraper.domain.port.TrendDiscoveryClient;
@@ -51,16 +52,16 @@ public class TrendingWorkflowService {
                 request.getMaxTrends(),
                 request.getMaxNewsPerTrend(),
                 request.shouldPublish());
-        List<String> discoveredTrends = discoverCandidateTrends(request);
+        List<TrendTopic> discoveredTrends = discoverCandidateTrends(request);
         log.info("Trending workflow discovered {} candidate trends.", discoveredTrends.size());
-        List<String> selectedTrends = trendSelectionService.pickFreshTrends(
+        List<TrendTopic> selectedTrends = trendSelectionService.pickFreshTrends(
                 discoveredTrends,
                 request.getMaxTrends(),
                 request.getTrendCooldownHours()
         );
         log.info("Trending workflow selected {} fresh trends after cooldown filtering: {}",
                 selectedTrends.size(),
-                selectedTrends);
+                selectedTrends.stream().map(TrendTopic::name).toList());
 
         if (selectedTrends.isEmpty()) {
             log.warn("No fresh trends available after cooldown filtering.");
@@ -71,28 +72,28 @@ public class TrendingWorkflowService {
         List<TrendHeadline> allHeadlines = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
 
-        for (String trend : selectedTrends) {
-            log.info("Collecting news for trend='{}' with maxNewsPerTrend={}", trend, request.getMaxNewsPerTrend());
+        for (TrendTopic trend : selectedTrends) {
+            log.info("Collecting news for trend='{}' with maxNewsPerTrend={}", trend.name(), request.getMaxNewsPerTrend());
             List<TrendHeadline> headlines = trendNewsClient.discover(
-                    trend,
+                    trend.name(),
                     request.getGeo(),
                     request.getLanguage(),
                     request.getMaxNewsPerTrend()
             );
-            log.info("Collected {} headlines for trend='{}'.", headlines.size(), trend);
+            log.info("Collected {} headlines for trend='{}'.", headlines.size(), trend.name());
             List<TrendHeadline> enrichedHeadlines = trendHeadlineDetailClient.enrich(headlines);
-            log.info("Enriched {} headlines with article details for trend='{}'.", enrichedHeadlines.size(), trend);
+            log.info("Enriched {} headlines with article details for trend='{}'.", enrichedHeadlines.size(), trend.name());
             allHeadlines.addAll(enrichedHeadlines);
 
             List<String> articleWarnings = new ArrayList<>();
             if (enrichedHeadlines.isEmpty()) {
-                articleWarnings.add("No headlines found for trend '" + trend + "'. AI article generation will rely on limited source input.");
-                log.warn("No headlines found for trend='{}'. AI article generation will run with limited source input.", trend);
+                articleWarnings.add("No headlines found for trend '" + trend.name() + "'. AI article generation will rely on limited source input.");
+                log.warn("No headlines found for trend='{}'. AI article generation will run with limited source input.", trend.name());
             }
 
-            GeneratedArticleDraft draft = articleGenerator.generate(trend, request.getLanguage(), enrichedHeadlines);
+            GeneratedArticleDraft draft = articleGenerator.generate(trend.name(), request.getLanguage(), enrichedHeadlines);
             log.info("Generated article for trend='{}' using strategy='{}' title='{}'.",
-                    trend,
+                    trend.name(),
                     draft.strategy(),
                     draft.title());
             PublishingResult publishingResult = articlePublisher.publish(
@@ -100,26 +101,26 @@ public class TrendingWorkflowService {
                     draft.markdown(),
                     draft.description(),
                     draft.tags(),
-                    trend,
+                    trend.name(),
                     enrichedHeadlines,
                     request
             );
             boolean published = request.shouldPublish() && publishingResult.success();
 
             if (!publishingResult.success()) {
-                warnings.add("Publishing failed for trend '" + trend + "': " + publishingResult.message());
-                log.warn("Publishing did not succeed for trend='{}': {}", trend, publishingResult.message());
+                warnings.add("Publishing failed for trend '" + trend.name() + "': " + publishingResult.message());
+                log.warn("Publishing did not succeed for trend='{}': {}", trend.name(), publishingResult.message());
             }
 
             if (published) {
                 trendSelectionService.remember(trend, true);
-                log.info("Recorded trend='{}' in history after successful publishing.", trend);
+                log.info("Recorded trend='{}' in history after successful publishing.", trend.name());
             } else {
-                log.info("Skipping cooldown history for trend='{}' because the article was not published successfully.", trend);
+                log.info("Skipping cooldown history for trend='{}' because the article was not published successfully.", trend.name());
             }
 
             articles.add(new GeneratedArticle(
-                    trend,
+                    trend.name(),
                     draft.title(),
                     draft.markdown(),
                     draft.tags(),
@@ -137,7 +138,12 @@ public class TrendingWorkflowService {
             log.warn("Workflow completed without any Selenium news headlines. AI article generation ran without source headlines.");
         }
 
-        TrendingArticleResponse response = new TrendingArticleResponse(selectedTrends, deduplicateHeadlines(allHeadlines), articles, warnings);
+        TrendingArticleResponse response = new TrendingArticleResponse(
+                selectedTrends.stream().map(TrendTopic::name).toList(),
+                deduplicateHeadlines(allHeadlines),
+                articles,
+                warnings
+        );
         log.info("Trending workflow completed with {} articles, {} warnings.",
                 response.articles().size(),
                 response.warnings().size());
@@ -150,7 +156,7 @@ public class TrendingWorkflowService {
         request.setLanguage(language);
         request.setMaxTrends(maxTrends);
         request.setRequestedTrends(requestedTrends);
-        return discoverCandidateTrends(request);
+        return discoverCandidateTrends(request).stream().map(TrendTopic::name).toList();
     }
 
     public List<TrendHeadline> discoverNews(String trend, String geo, String language, int maxNewsPerTrend) {
@@ -164,11 +170,12 @@ public class TrendingWorkflowService {
         return headlines;
     }
 
-    private List<String> discoverCandidateTrends(TrendingArticleRequest request) {
+    private List<TrendTopic> discoverCandidateTrends(TrendingArticleRequest request) {
         if (request.getRequestedTrends() != null && !request.getRequestedTrends().isEmpty()) {
-            List<String> requestedTrends = request.getRequestedTrends().stream()
+            List<TrendTopic> requestedTrends = request.getRequestedTrends().stream()
                     .map(String::trim)
                     .filter(value -> !value.isBlank())
+                    .map(value -> new TrendTopic(value, value.toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("(^-|-$)", ""), List.of(value)))
                     .limit(request.getMaxTrends())
                     .toList();
             log.info("Using {} requested trends from request instead of Selenium discovery.", requestedTrends.size());

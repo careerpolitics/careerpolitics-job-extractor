@@ -1,5 +1,6 @@
 package com.careerpolitics.scraper.application;
 
+import com.careerpolitics.scraper.domain.model.TrendTopic;
 import com.careerpolitics.scraper.domain.port.TrendHistoryStore;
 import org.junit.jupiter.api.Test;
 
@@ -16,22 +17,28 @@ class TrendSelectionServiceTest {
         TrendHistoryStore historyStore = new TrendHistoryStore() {
             @Override
             public Set<String> findUsedSince(LocalDateTime cutoff) {
-                return Set.of("ai-jobs", "fed-rate");
+                return Set.of("openai-jobs", "fed-rate");
             }
 
             @Override
-            public void save(String trend, boolean published) {
+            public void save(TrendTopic trendTopic, boolean published) {
             }
         };
 
         TrendSelectionService service = new TrendSelectionService(historyStore, new TrendNormalizer());
 
-        List<String> result = service.pickFreshTrends(
-                List.of("AI Jobs", "AI Jobs", "NCAA", "Fed Rate", "March Madness"),
+        List<TrendTopic> result = service.pickFreshTrends(
+                List.of(
+                        new TrendTopic("AI Jobs", "ai-jobs", List.of("AI Jobs", "OpenAI jobs")),
+                        new TrendTopic("AI Jobs", "ai-jobs", List.of("AI Jobs", "OpenAI jobs")),
+                        new TrendTopic("NCAA", "ncaa", List.of("NCAA")),
+                        new TrendTopic("Fed Rate", "fed-rate", List.of("Fed Rate")),
+                        new TrendTopic("March Madness", "march-madness", List.of("March Madness"))
+                ),
                 3,
                 24
         );
 
-        assertEquals(List.of("NCAA", "March Madness"), result);
+        assertEquals(List.of("NCAA", "March Madness"), result.stream().map(TrendTopic::name).toList());
     }
 }

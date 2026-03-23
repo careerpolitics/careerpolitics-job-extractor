@@ -4,6 +4,7 @@ import com.careerpolitics.scraper.domain.model.ArticleDetails;
 import com.careerpolitics.scraper.domain.model.GeneratedArticleDraft;
 import com.careerpolitics.scraper.domain.model.PublishingResult;
 import com.careerpolitics.scraper.domain.model.TrendHeadline;
+import com.careerpolitics.scraper.domain.model.TrendTopic;
 import com.careerpolitics.scraper.domain.port.ArticleGenerator;
 import com.careerpolitics.scraper.domain.port.ArticlePublisher;
 import com.careerpolitics.scraper.domain.port.TrendDiscoveryClient;
@@ -47,8 +48,9 @@ class TrendingWorkflowServiceTest {
                 new TrendHeadline("AI Jobs", "Hiring expands", "https://example.com/story", "Reuters", null, "Summary",
                         new ArticleDetails("Summary", "Detailed content", List.of("https://example.com/image.jpg"), "image"))
         );
-        when(trendDiscoveryClient.discover(anyString(), anyString(), anyInt())).thenReturn(List.of("AI Jobs"));
-        when(trendSelectionService.pickFreshTrends(anyList(), anyInt(), anyInt())).thenReturn(List.of("AI Jobs"));
+        TrendTopic aiJobs = new TrendTopic("AI Jobs", "ai-jobs", List.of("AI Jobs", "OpenAI jobs"));
+        when(trendDiscoveryClient.discover(anyString(), anyString(), anyInt())).thenReturn(List.of(aiJobs));
+        when(trendSelectionService.pickFreshTrends(anyList(), anyInt(), anyInt())).thenReturn(List.of(aiJobs));
         when(trendNewsClient.discover(anyString(), anyString(), anyString(), anyInt())).thenReturn(headlines);
         when(trendHeadlineDetailClient.enrich(headlines)).thenReturn(headlines);
         when(articleGenerator.generate(anyString(), anyString(), anyList())).thenReturn(
@@ -62,7 +64,7 @@ class TrendingWorkflowServiceTest {
         request.setPublish(true);
         service.generate(request);
 
-        verify(trendSelectionService).remember("AI Jobs", true);
+        verify(trendSelectionService).remember(aiJobs, true);
     }
 
     @Test
@@ -82,8 +84,9 @@ class TrendingWorkflowServiceTest {
                 trendHeadlineDetailClient
         );
 
-        when(trendDiscoveryClient.discover(anyString(), anyString(), anyInt())).thenReturn(List.of("AI Jobs"));
-        when(trendSelectionService.pickFreshTrends(anyList(), anyInt(), anyInt())).thenReturn(List.of("AI Jobs"));
+        TrendTopic aiJobs = new TrendTopic("AI Jobs", "ai-jobs", List.of("AI Jobs", "OpenAI jobs"));
+        when(trendDiscoveryClient.discover(anyString(), anyString(), anyInt())).thenReturn(List.of(aiJobs));
+        when(trendSelectionService.pickFreshTrends(anyList(), anyInt(), anyInt())).thenReturn(List.of(aiJobs));
         when(trendNewsClient.discover(anyString(), anyString(), anyString(), anyInt())).thenReturn(List.of());
         when(trendHeadlineDetailClient.enrich(List.of())).thenReturn(List.of());
         when(articleGenerator.generate(anyString(), anyString(), anyList())).thenReturn(
@@ -97,7 +100,7 @@ class TrendingWorkflowServiceTest {
         request.setPublish(true);
         service.generate(request);
 
-        verify(trendSelectionService, never()).remember(anyString(), anyBoolean());
+        verify(trendSelectionService, never()).remember(any(TrendTopic.class), anyBoolean());
     }
 
     @Test
@@ -121,8 +124,9 @@ class TrendingWorkflowServiceTest {
                 new TrendHeadline("AI Jobs", "Hiring expands", "https://example.com/story", "Reuters", null, "Summary",
                         new ArticleDetails("Summary", "Detailed content", List.of("https://example.com/image.jpg"), "image"))
         );
-        when(trendDiscoveryClient.discover(anyString(), anyString(), anyInt())).thenReturn(List.of("AI Jobs"));
-        when(trendSelectionService.pickFreshTrends(anyList(), anyInt(), anyInt())).thenReturn(List.of("AI Jobs"));
+        TrendTopic aiJobs = new TrendTopic("AI Jobs", "ai-jobs", List.of("AI Jobs", "OpenAI jobs"));
+        when(trendDiscoveryClient.discover(anyString(), anyString(), anyInt())).thenReturn(List.of(aiJobs));
+        when(trendSelectionService.pickFreshTrends(anyList(), anyInt(), anyInt())).thenReturn(List.of(aiJobs));
         when(trendNewsClient.discover(anyString(), anyString(), anyString(), anyInt())).thenReturn(headlines);
         when(trendHeadlineDetailClient.enrich(headlines)).thenReturn(headlines);
         when(articleGenerator.generate(anyString(), anyString(), anyList())).thenReturn(
@@ -137,6 +141,6 @@ class TrendingWorkflowServiceTest {
         service.generate(request);
 
         verify(articlePublisher).publish(anyString(), anyString(), anyString(), anyList(), anyString(), anyList(), any());
-        verify(trendSelectionService, never()).remember(anyString(), anyBoolean());
+        verify(trendSelectionService, never()).remember(any(TrendTopic.class), anyBoolean());
     }
 }

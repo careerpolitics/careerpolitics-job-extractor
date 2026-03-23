@@ -1,5 +1,6 @@
 package com.careerpolitics.scraper.infrastructure.selenium;
 
+import com.careerpolitics.scraper.application.TrendNormalizer;
 import com.careerpolitics.scraper.config.TrendingProperties;
 import com.careerpolitics.scraper.domain.model.TrendTopic;
 import org.junit.jupiter.api.Test;
@@ -18,11 +19,12 @@ class GoogleTrendsSeleniumClientTest {
         GoogleTrendsSeleniumClient client = new GoogleTrendsSeleniumClient(
                 null,
                 properties(),
+                new TrendNormalizer(),
                 (tableHtml, maxTopics) -> {
                     capturedTableHtml.append(tableHtml);
                     return List.of(
-                            new TrendTopic("AI Hiring", "ai-hiring"),
-                            new TrendTopic("Federal Reserve", "federal-reserve")
+                            new TrendTopic("AI Hiring", "ai-hiring", List.of("AI Layoffs", "OpenAI jobs", "Anthropic hiring")),
+                            new TrendTopic("Federal Reserve", "federal-reserve", List.of("Federal Reserve", "Fed meeting"))
                     );
                 }
         );
@@ -47,7 +49,7 @@ class GoogleTrendsSeleniumClientTest {
                 </body></html>
                 """;
 
-        assertEquals(List.of("AI Hiring", "Federal Reserve"), client.parse(html, 5));
+        assertEquals(List.of("AI Hiring", "Federal Reserve"), client.parse(html, 5).stream().map(TrendTopic::name).toList());
         assertTrue(capturedTableHtml.toString().contains("<table>"));
         assertTrue(capturedTableHtml.toString().contains("OpenAI jobs"));
         assertTrue(capturedTableHtml.toString().contains("Anthropic hiring"));
@@ -58,7 +60,8 @@ class GoogleTrendsSeleniumClientTest {
         GoogleTrendsSeleniumClient client = new GoogleTrendsSeleniumClient(
                 null,
                 properties(),
-                (tableHtml, maxTopics) -> List.of(new TrendTopic("Unexpected", "unexpected"))
+                new TrendNormalizer(),
+                (tableHtml, maxTopics) -> List.of(new TrendTopic("Unexpected", "unexpected", List.of("Unexpected")))
         );
 
         assertEquals(List.of(), client.parse("<html><body><div>No table</div></body></html>", 5));

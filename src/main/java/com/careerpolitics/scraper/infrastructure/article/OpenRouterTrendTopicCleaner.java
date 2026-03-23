@@ -14,6 +14,7 @@ import org.springframework.web.client.RestClient;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -112,12 +113,26 @@ public class OpenRouterTrendTopicCleaner implements TrendTopicCleaner {
             if (name.isBlank() || slug.isBlank()) {
                 continue;
             }
-            topics.putIfAbsent(slug, new TrendTopic(name, slug));
+            topics.putIfAbsent(slug, new TrendTopic(name, slug, extractKeywords(topicNode.path("keywords"), name)));
             if (topics.size() >= maxTopics) {
                 break;
             }
         }
         return new ArrayList<>(topics.values());
+    }
+
+    private List<String> extractKeywords(JsonNode keywordsNode, String topicName) {
+        LinkedHashSet<String> keywords = new LinkedHashSet<>();
+        keywords.add(trendNormalizer.clean(topicName));
+        if (keywordsNode != null && keywordsNode.isArray()) {
+            for (JsonNode keywordNode : keywordsNode) {
+                String keyword = trendNormalizer.clean(keywordNode.asText(""));
+                if (!keyword.isBlank()) {
+                    keywords.add(keyword);
+                }
+            }
+        }
+        return new ArrayList<>(keywords);
     }
 
     String extractJsonPayload(String value) {
