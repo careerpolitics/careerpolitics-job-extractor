@@ -2,7 +2,6 @@ package com.careerpolitics.scraper.infrastructure.article;
 
 import com.careerpolitics.scraper.application.TrendNormalizer;
 import com.careerpolitics.scraper.config.TrendingProperties;
-import com.careerpolitics.scraper.domain.model.TrendDiscoveryCandidate;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestClient;
 
@@ -14,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class OpenRouterTrendTopicCleanerTest {
 
     @Test
-    void fallbackTopicsUsesHeadlineWhenAiIsDisabled() {
+    void cleanTopicsReturnsEmptyWhenAiIsDisabled() {
         OpenRouterTrendTopicCleaner cleaner = new OpenRouterTrendTopicCleaner(
                 RestClient.create(),
                 new com.fasterxml.jackson.databind.ObjectMapper(),
@@ -22,12 +21,7 @@ class OpenRouterTrendTopicCleanerTest {
                 new TrendNormalizer()
         );
 
-        var topics = cleaner.cleanTopics(List.of(
-                new TrendDiscoveryCandidate("AI Hiring", List.of("OpenAI jobs", "Anthropic hiring"), "AI Hiring OpenAI jobs Anthropic hiring"),
-                new TrendDiscoveryCandidate("Federal Reserve", List.of("Fed meeting"), "Federal Reserve Fed meeting")
-        ), 5);
-
-        assertThat(topics).extracting("name").containsExactly("AI Hiring", "Federal Reserve");
+        assertThat(cleaner.cleanTopics("<table><tbody><tr><td>AI Jobs</td></tr></tbody></table>", 5)).isEmpty();
     }
 
     @Test
@@ -51,9 +45,7 @@ class OpenRouterTrendTopicCleanerTest {
                 }
                 """;
 
-        var topics = cleaner.parseTopics(response, 5, List.of(
-                new TrendDiscoveryCandidate("AI Layoffs", List.of("OpenAI jobs"), "AI Layoffs OpenAI jobs")
-        ));
+        var topics = cleaner.parseTopics(response, 5);
 
         assertThat(topics).extracting("name").containsExactly("AI Hiring", "Federal Reserve");
     }

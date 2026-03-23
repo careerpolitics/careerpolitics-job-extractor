@@ -1,78 +1,45 @@
 package com.careerpolitics.scraper.infrastructure.selenium;
 
-import com.careerpolitics.scraper.application.TrendNormalizer;
 import com.careerpolitics.scraper.config.TrendingProperties;
-import com.careerpolitics.scraper.domain.model.TrendDiscoveryCandidate;
 import com.careerpolitics.scraper.domain.model.TrendTopic;
-import com.careerpolitics.scraper.domain.port.TrendTopicCleaner;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
 import java.time.Duration;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertIterableEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GoogleTrendsSeleniumClientTest {
 
     @Test
-    void parseReturnsUniqueVisibleTrendTerms() {
+    void parseExtractsTrendTableHtmlAndDelegatesToAiCleaner() {
+        StringBuilder capturedTableHtml = new StringBuilder();
         GoogleTrendsSeleniumClient client = new GoogleTrendsSeleniumClient(
                 null,
                 properties(),
-                new TrendNormalizer(),
-                (candidates, maxTopics) -> candidates.stream()
-                        .map(candidate -> new TrendTopic(candidate.title(), new TrendNormalizer().slug(candidate.title())))
-                        .toList()
+                (tableHtml, maxTopics) -> {
+                    capturedTableHtml.append(tableHtml);
+                    return List.of(
+                            new TrendTopic("AI Hiring", "ai-hiring"),
+                            new TrendTopic("Federal Reserve", "federal-reserve")
+                    );
+                }
         );
 
         String html = """
                 <html><body>
-                  <div class='mZ3RIc'>March Madness</div>
-                  <div class='mZ3RIc'>March Madness</div>
-                  <div data-term='AI Jobs'></div>
-                </body></html>
-                """;
-
-        assertEquals(List.of("March Madness", "AI Jobs"), client.parse(html, 5));
-    }
-
-    @Test
-    void parseKeepsOnlyHeadlineTrendsWhenRowsContainBreakdownsAndUiNoise() {
-        List<TrendDiscoveryCandidate> capturedCandidates = new ArrayList<>();
-        TrendTopicCleaner cleaner = (candidates, maxTopics) -> {
-            capturedCandidates.addAll(candidates);
-            return List.of(
-                    new TrendTopic("AI Hiring", "ai-hiring"),
-                    new TrendTopic("Federal Reserve", "federal-reserve")
-            );
-        };
-        GoogleTrendsSeleniumClient client = new GoogleTrendsSeleniumClient(null, properties(), new TrendNormalizer(), cleaner);
-
-        String html = """
-                <html><body>
+                  <div>ignored wrapper</div>
                   <table>
                     <tbody>
                       <tr>
                         <td>1</td>
                         <td>
                           <div class='mZ3RIc'>AI Layoffs</div>
-                          <div>trending_up</div>
-                          <div>Active</div>
-                          <div>5K+ searches</div>
-                          <div>2 hours ago</div>
                           <div class='trend-breakdown'>
                             <a title='OpenAI jobs'>OpenAI jobs</a>
                             <a title='Anthropic hiring'>Anthropic hiring</a>
                           </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>2</td>
-                        <td>
-                          <div data-term='Federal Reserve'></div>
-                          <div>10K+ searches</div>
                         </td>
                       </tr>
                     </tbody>
@@ -81,9 +48,20 @@ class GoogleTrendsSeleniumClientTest {
                 """;
 
         assertEquals(List.of("AI Hiring", "Federal Reserve"), client.parse(html, 5));
-        assertEquals("AI Layoffs", capturedCandidates.get(0).title());
-        assertIterableEquals(List.of("OpenAI jobs", "Anthropic hiring"), capturedCandidates.get(0).breakdowns());
-        assertEquals("Federal Reserve", capturedCandidates.get(1).title());
+        assertTrue(capturedTableHtml.toString().contains("<table>"));
+        assertTrue(capturedTableHtml.toString().contains("OpenAI jobs"));
+        assertTrue(capturedTableHtml.toString().contains("Anthropic hiring"));
+    }
+
+    @Test
+    void parseReturnsEmptyWhenNoTrendTableExists() {
+        GoogleTrendsSeleniumClient client = new GoogleTrendsSeleniumClient(
+                null,
+                properties(),
+                (tableHtml, maxTopics) -> List.of(new TrendTopic("Unexpected", "unexpected"))
+        );
+
+        assertEquals(List.of(), client.parse("<html><body><div>No table</div></body></html>", 5));
     }
 
     private TrendingProperties properties() {
