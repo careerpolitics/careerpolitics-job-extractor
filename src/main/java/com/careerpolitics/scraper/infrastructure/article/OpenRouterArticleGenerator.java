@@ -121,7 +121,6 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
                 Use relevant sections logically. Each section must add new information (no repetition).
                 
                 ## Overview
-                ## Why This Is Trending
                 ## Important Dates
                 ## Vacancy Details
                 ## Eligibility Criteria
@@ -160,6 +159,7 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
                   - Detailed eligibility breakdown
                   - Extended FAQs (if needed)
                 • Do NOT hide critical information inside details
+                • Syntax: `{%% details Summary %%} ... {%% enddetails %%}`
                 
                 3. HIGHLIGHT BLOCK (IMPORTANT)
                 • Use at most ONE highlight/card block
@@ -167,12 +167,18 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
                   - Last date
                   - Major change
                   - Important warning
+                • Syntax: `{%% card %%} ... {%% endcard %%}`
                 
-                4. CONTENT DENSITY
+                4. CALL TO ACTION (OPTIONAL)
+                • If the source data includes an official URL (apply link, notification PDF), you may add ONE CTA at the end.
+                • Use this format: `{%% cta URL %%} Click here to ... {%% endcta %%}`
+                • Do NOT use CTAs for social media or promotional content.
+                
+                5. CONTENT DENSITY
                 • Every paragraph must add new information
                 • Avoid filler, repetition, or generic statements
                 
-                5. READABILITY
+                6. READABILITY
                 • Maintain clear section separation
                 • Avoid large text blocks
                 • Ensure mobile-friendly formatting
@@ -208,27 +214,28 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
                 
                 ---
                 
-                STEP 6A — FAQ GENERATION (MANDATORY)
+                STEP 7 — FAQ GENERATION (MANDATORY)
                 
-                • Include 3 to 5 FAQs at the end
+                • Include 3 to 5 FAQs within the FAQ section
                 • Questions must reflect real search queries:
                   - What is the last date?
                   - Who is eligible?
                   - What is the salary?
                   - How to apply?
-                
                 • Answers must be:
                   - Direct
                   - Fact-based
                   - 1–3 lines max
-                
                 • Do NOT repeat content unnecessarily
                 • If data is missing, write:
                   "As of now, no official confirmation is available."
+                • Formatting options (choose one that fits the article):
+                  - Simple Q&A list: **Q:** ... **A:** ...
+                  - Collapsible sections: `{%% details Question %%} Answer {%% enddetails %%}`
                 
                 ---
                 
-                STEP 7 — TITLE
+                STEP 8 — TITLE
                 
                 • Make it clear, specific, and SEO-friendly
                 • Use numbers, salary, or dates when useful
@@ -236,7 +243,7 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
                 
                 ---
                 
-                STEP 8 — DESCRIPTION
+                STEP 9 — DESCRIPTION
                 
                 • Write one concise, high-information summary
                 • Include key elements such as role, dates, or opportunity
@@ -245,9 +252,9 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
                 
                 ---
                 
-                STEP 9 — TAGS
+                STEP 10 — TAGS
                 
-                • Choose 1 to 4 tags
+                • Choose 4 tags
                 • Tags must reflect:
                   - Exam or job name
                   - Category (government-jobs, results, admit-card, etc.)
