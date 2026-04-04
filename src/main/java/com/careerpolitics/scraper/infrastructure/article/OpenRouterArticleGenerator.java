@@ -281,7 +281,7 @@ public class OpenRouterArticleGenerator implements ArticleGenerator {
                   "title": "Clear and SEO-optimized headline",
                   "markdown": "Full article in valid Forem markdown",
                   "description": "Short plain-text summary",
-                  "tags": ["tag-one", "tag-two"]
+                  "tags": ["tag-one", "tag-two","tag-three","tag-four"]
                 }
                 
                 IMPORTANT:

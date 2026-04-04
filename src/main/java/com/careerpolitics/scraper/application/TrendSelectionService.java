@@ -38,8 +38,7 @@ public class TrendSelectionService {
         }
 
         Set<String> recentlyUsed = trendHistoryStore.findUsedSince(LocalDateTime.now().minusHours(cooldownHours));
-        return uniqueBySlug.entrySet().stream()
-                .map(java.util.Map.Entry::getValue)
+        return uniqueBySlug.values().stream()
                 .filter(topic -> isFresh(topic, recentlyUsed))
                 .limit(Math.max(1, maxTrends))
                 .toList();
