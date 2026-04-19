@@ -104,7 +104,7 @@ public class TrendingWorkflowService {
                     enrichedHeadlines,
                     request
             );
-            boolean published = request.shouldPublish() && publishingResult.success();
+            boolean published = publishingResult.success();
 
             if (!publishingResult.success()) {
                 warnings.add("Publishing failed for trend '" + trend + "': " + publishingResult.message());

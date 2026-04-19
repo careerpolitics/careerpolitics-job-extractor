@@ -9,7 +9,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
-import org.springframework.stereotype.Component;
 
 import java.net.URLDecoder;
 import java.net.URLEncoder;
@@ -21,7 +20,6 @@ import java.util.List;
 import java.util.Locale;
 
 @Slf4j
-@Component
 public class GoogleNewsSeleniumClient implements TrendNewsClient {
 
     private final SeleniumBrowserClient browserClient;

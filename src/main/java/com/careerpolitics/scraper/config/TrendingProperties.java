@@ -29,6 +29,8 @@ public record TrendingProperties(
 
     public record News(
             @NotBlank String googleSearchUrl,
+            @NotBlank String googleNewsRssUrl,
+            boolean rssEnabled,
             @Min(1) @Max(20) int defaultMaxNewsPerTrend
     ) {
     }

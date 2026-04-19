@@ -29,6 +29,8 @@ careerpolitics:
     news:
       google-search-url: ${GOOGLE_SEARCH_URL:https://www.google.com/search}
       default-max-news-per-trend: ${TRENDING_DEFAULT_MAX_NEWS_PER_TREND:4}
+      google-news-rss-url: ${GOOGLE_NEWS_RSS_URL:https://news.google.com/rss/search}
+      rss-enabled: ${GOOGLE_NEWS_RSS_ENABLED:true}
     selenium:
       enabled: ${SELENIUM_ENABLED:true}
       news-enabled: ${SELENIUM_NEWS_ENABLED:true}
